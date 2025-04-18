@@ -1,0 +1,67 @@
+name: Manual Build and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      releaseTag:
+        description: 'Release tag (e.g. v1.0.0)'
+        required: true
+      releaseName:
+        description: 'Release name'
+        required: true
+      releaseNotes:
+        description: 'Release notes'
+        required: false
+        default: ''
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+   
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+        
+    - name: Restore dependencies
+      run: dotnet restore src
+      
+    - name: Build
+      run: dotnet build src --configuration Release --no-restore
+
+    # build in release should already publish
+    # - name: Test
+    #   run: dotnet test src --configuration Release --no-build --verbosity normal
+      
+    # - name: Publish
+    #   run: dotnet publish src/LgpCli/LgpCli.csproj --configuration Release --no-build --self-contained true -p:PublishSingleFile=true -r win-x64 -o publish
+      
+    - name: Archive build output
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-output
+        path: publish/
+        
+    - name: Create ZIP archive
+      run: |
+        cd publish
+        Compress-Archive -Path "*.exe", "*.json" -DestinationPath ../LgpCli-${{ github.event.inputs.releaseTag }}.zip
+        cd ..
+      shell: pwsh
+      
+    - name: Create Release
+      id: create_release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.event.inputs.releaseTag }}
+        name: ${{ github.event.inputs.releaseName }}
+        body: ${{ github.event.inputs.releaseNotes }}
+        draft: false
+        prerelease: false
+        files: LgpCli-${{ github.event.inputs.releaseTag }}.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
