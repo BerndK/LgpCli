@@ -64,7 +64,20 @@
   <!-- placeholder task to force Publish to happen during build  
        NOTE: Publishing does not work for MultiTarget projects, see C:\Program Files\dotnet\sdk\8.0.100\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.Sdk.CrossTargeting.targets -->
   <Target Name="PublishAsBuildAfterTarget" AfterTargets="Rebuild" DependsOnTargets="Publish" Condition=" '$(Configuration)' == 'Release'">
-    <Message Importance="High" Text="$(ProjectName) $(TargetFramework) Publishing..." />
+    <!--AfterPublish for netCore projects that are internally published-->
+    <PropertyGroup>
+      <LgpCliAssetsPublishSourceFolder>.\bin\Release\net9.0-windows\win-x64\publish\</LgpCliAssetsPublishSourceFolder>
+      <LgpCliAssetsPublishTargetFolder>..\publish\</LgpCliAssetsPublishTargetFolder>
+      <!--do not use $(ProjectName) it is nor more valid here-->
+    </PropertyGroup>
+    <Message Importance="High" Text="$(ProjectName) $(TargetFramework) Publishing $(LgpCliAssetsPublishSourceFolder) to $(LgpCliAssetsPublishTargetFolder)..." />
+    <ItemGroup>
+      <LgpCliAssetsToRemove Include="$(LgpCliAssetsPublishTargetFolder)**/*.*" />
+      <LgpCliAssetsToPublish Include="$(LgpCliAssetsPublishSourceFolder)**/*.*" />
+    </ItemGroup>
+    <Delete Files="@(LgpCliAssetsToRemove)" ContinueOnError="false"></Delete>
+    <Message Importance="High" Text="%09@(LgpCliAssetsToPublish->'%(Identity)', '%0D%0A%09')" />
+    <Copy SourceFiles="@(LgpCliAssetsToPublish)" DestinationFolder="$(LgpCliAssetsPublishTargetFolder)" SkipUnchangedFiles="true" />
   </Target>
 
 </Project>

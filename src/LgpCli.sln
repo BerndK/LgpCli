@@ -9,6 +9,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	ProjectSection(SolutionItems) = preProject
 		..\.editorconfig = ..\.editorconfig
 		Directory.Build.props = Directory.Build.props
+		..\.github\workflows\dotnet-desktop.yml = ..\.github\workflows\dotnet-desktop.yml
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LgpCore", "LgpCore\LgpCore.csproj", "{B7C2D42A-3504-49B1-AA64-801EF963D245}"
