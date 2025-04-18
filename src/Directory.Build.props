@@ -1,0 +1,28 @@
+﻿<Project>
+  <!--scan other (higher level) files also, see https://learn.microsoft.com/en-us/visualstudio/msbuild/customize-by-directory?view=vs-2022#use-case-multi-level-merging 
+  or https://stackoverflow.com/q/45974279/1797939 -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" Condition="Exists($([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../')))"/>
+  
+  <PropertyGroup>
+    <Version>0.8.1</Version>
+    <!--
+      see https://learn.microsoft.com/de-de/dotnet/core/project-sdk/msbuild-props#generateassemblyinfo
+      see https://learn.microsoft.com/en-us/visualstudio/msbuild/customize-your-build  
+      Version History:
+      0.8.0 Initial version
+      0.8.1 Run as admin
+    -->
+    <Company>BK</Company>
+    <Copyright>© 2025, Bernd Klaiber</Copyright>
+    <Description>Cli tool to manage local group policies</Description>
+    <Product>Local Group Policy CLI</Product>
+  </PropertyGroup>
+
+  <!--Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'"-->
+
+  <PropertyGroup>
+    <DefineConstants>$(DefineConstants);UseAOT</DefineConstants>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+  </PropertyGroup>
+
+</Project>

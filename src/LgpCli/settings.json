@@ -1,0 +1,13 @@
+{
+  "Logging": {
+    "SimpleFile": {
+      "SimpleFileRollingOptions": {
+        "MaxFileCount": 5,
+        "Location": "ExecutableLogsDirectory"
+      }
+    },
+    "LogLevel": {
+      "Default": "Debug"
+    }
+  }
+}

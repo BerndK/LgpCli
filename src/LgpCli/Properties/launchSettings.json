@@ -1,0 +1,47 @@
+{
+  "profiles": {
+    "LgpCli": {
+      "commandName": "Project"
+    },
+    "Enum": {
+      "commandName": "Project",
+      "commandLineArgs": "interactive show bits.BITS_SetTransferPolicyOnCostedNetwork machine"
+    },
+    "Enum (Explorer Ribbon)": {
+      "commandName": "Project",
+      "commandLineArgs": "interactive show windows.ExplorerRibbonStartsMinimized User"
+    },
+    "MultiText": {
+      "commandName": "Project",
+      "commandLineArgs": "interactive show inetres.SiteDiscoveryDomainAllowList User"
+    },
+    "Boolean": {
+      "commandName": "Project",
+      "commandLineArgs": "interactive show inetres.MediaSettings User"
+    },
+    "CommandSearch": {
+      "commandName": "Project",
+      "commandLineArgs": "search -s MediaSettings -s Geolocation"
+    },
+    "CommandGetState": {
+      "commandName": "Project",
+      "commandLineArgs": "get-state MicrosoftEdge.Favorites Both"
+    },
+    "CommandEnable": {
+      "commandName": "Project",
+      "commandLineArgs": "enable inetres.MediaSettings User -k BlockMedia -v \"True\" -k PlayByDefault -v \"True\""
+    },
+    "CommandDisable": {
+      "commandName": "Project",
+      "commandLineArgs": "disable inetres.MediaSettings User"
+    },
+    "CommandNotConfigure": {
+      "commandName": "Project",
+      "commandLineArgs": "notconfigure inetres.MediaSettings User"
+    },
+    "CommandBatch": {
+      "commandName": "Project",
+      "commandLineArgs": "batch \"C:\\Program Files\\test.lgp\" -coe"
+    }
+  }
+}

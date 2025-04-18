@@ -1,0 +1,26 @@
+﻿<Directives xmlns="http://schemas.microsoft.com/netfx/2013/01/metadata">
+  <Application>
+    <!-- Define assemblies or types needed for Reflection here 
+    see format details: https://github.com/dotnet/corert/blob/master/Documentation/using-corert/rd-xml-format.md 
+    include in csproj:
+      <ItemGroup>
+        <RdXmlFile Include="rd.xml" />
+      </ItemGroup>
+    see also here: https://github.com/dotnet/corert/blob/master/Documentation/using-corert/reflection-in-aot-mode.md-->
+    
+    <!--
+    this is needed at least for DebugServiceProvider: (~2.5MB)
+    <Assembly Name="Microsoft.Extensions.Configuration" Dynamic="Required All" />
+    <Assembly Name="Microsoft.Extensions.Configuration.Abstractions" Dynamic="Required All" />
+    <Assembly Name="Microsoft.Extensions.Logging" Dynamic="Required All" />
+    <Assembly Name="Microsoft.Extensions.Logging.Abstractions" Dynamic="Required All" />
+    <Assembly Name="Microsoft.Extensions.Logging.Configuration" Dynamic="Required All" />
+    <Assembly Name="Microsoft.Extensions.DependencyInjection" Dynamic="Required All" />
+    <Assembly Name="Microsoft.Extensions.DependencyInjection.Abstractions" Dynamic="Required All" />
+    -->
+    
+    <!--<Assembly Name="MonoGame.Framework">
+      <Type Name="Microsoft.Xna.Framework.Content.ListReader`1[[System.Char,mscorlib]]" Dynamic="Required All" />
+    </Assembly>-->
+  </Application>
+</Directives>
