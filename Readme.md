@@ -1,7 +1,7 @@
 # LgpCli - Local Group policy CommandLine Interface
 This is a tool to manage your local group policies. 
 
-![Screencast of LgpCli Main workflow](./doc/SearchAndSetPolicy.gif)
+[![Screencast of LgpCli Main workflow](./doc/SearchAndSetPolicy.gif)](./doc/SearchAndSetPolicy.mp4 "Click to see video pause/stoppable")
 
 It can:
  - apply / modify policies
