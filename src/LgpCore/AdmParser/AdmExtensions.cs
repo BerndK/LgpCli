@@ -3,6 +3,7 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using LgpCore.Gpo;
 
 namespace LgpCore.AdmParser
 {
@@ -165,6 +166,31 @@ namespace LgpCore.AdmParser
           return multiTextElement.Required;
         case TextElement textElement:
           return textElement.Required;
+        default:
+          return null;
+      }
+    }
+
+    public static object? NullValue(this PolicyElement e)
+    {
+      switch (e)
+      {
+        case ListElement listElement:
+          return listElement.ExplicitValue
+            ? new List<KeyValuePair<string, string>>()
+            : new List<string>();
+        case DecimalElement decimalElement:
+          return (int)0;
+        case EnumElement enumElement:
+          return enumElement.Items.FirstOrDefault()?.Id();
+        case BooleanElement booleanElement:
+          return false;
+        case LongDecimalElement longDecimalElement:
+          return (long)0;
+        case MultiTextElement multiTextElement:
+          return Array.Empty<string>();
+        case TextElement textElement:
+          return string.Empty;
         default:
           return null;
       }

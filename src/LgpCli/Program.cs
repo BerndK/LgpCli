@@ -32,7 +32,7 @@ namespace LgpCli
       var appInfo = serviceProvider.GetRequiredService<AppInfo>();
       var logger = serviceProvider.GetRequiredKeyedService<ILogger>(null);
       //Alternative: var logger = serviceProvider.GetRequiredService<ILogger<Program>>();
-      logger.LogInformation($"Startup {appInfo.Title} {appInfo.Ver}");
+      logger.LogInformation($"Startup {appInfo.Title} {appInfo.Ver} on '{Environment.MachineName}' Local {DateTime.Now} UTC:{DateTimeOffset.Now:O}");
 
       //Test logging
       //logger.LogTrace("Trace");
@@ -128,6 +128,8 @@ namespace LgpCli
       //define an own Formatter: services.AddSingleton<SimpleFileLoggerFormatterBase, MyOwnSimpleFileLoggerFormatter>();
       //or configure the builtin one's options
       //services.Configure<SimpleFileFormatterOptions>(options => options.SingleLine = false);
+      services.Configure<SimpleFileFormatterOptions>(options => options.IncludeScopes = true);
+      services.Configure<SimpleFileFormatterOptions>(config.GetSection("Logging:SimpleFile:SimpleFileFormatterOptions"));
 
       string? language = config.AppSection()["admLanguage"];
       services.AddSingleton(Task.Run(() =>

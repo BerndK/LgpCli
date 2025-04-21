@@ -425,17 +425,30 @@ namespace Infrastructure.Logging.SimpleFile
         bool paddingNeeded = !singleLine;
         scopeProvider.ForEachScope((scope, state) =>
         {
+          ////scope starts with =>
+          //if (paddingNeeded)
+          //{
+          //  paddingNeeded = false;
+          //  state.Append(messagePadding);
+          //  state.Append("=> ");
+          //}
+          //else
+          //{
+          //  state.Append(" => ");
+          //}
+          //state.Append(scope);
+
+          //scope ends with '=> '
           if (paddingNeeded)
           {
             paddingNeeded = false;
             state.Append(messagePadding);
-            state.Append("=> ");
           }
           else
-          {
-            state.Append(" => ");
-          }
+            state.Append(" ");
           state.Append(scope);
+          state.Append("=> ");
+
         }, sb);
 
         if (!paddingNeeded && !singleLine)

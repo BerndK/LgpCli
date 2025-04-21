@@ -4,13 +4,14 @@
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" Condition="Exists($([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../')))"/>
   
   <PropertyGroup>
-    <Version>0.8.1</Version>
+    <Version>0.8.2</Version>
     <!--
       see https://learn.microsoft.com/de-de/dotnet/core/project-sdk/msbuild-props#generateassemblyinfo
       see https://learn.microsoft.com/en-us/visualstudio/msbuild/customize-your-build  
       Version History:
       0.8.0 Initial version
       0.8.1 Run as admin
+      0.8.2 better logging, allow nullable values (e.g. for TextElement)
     -->
     <Company>BK</Company>
     <Copyright>© 2025, Bernd Klaiber</Copyright>

@@ -10,8 +10,18 @@ namespace LgpCore.Gpo
     public Policy Policy { get; }
     public PolicyClass PolicyClass { get; }
     public Dictionary<PolicyElement, object?> Values { get; private set; }
-    public bool AllValuesSet => Values.All(e => e.Value != null);
-    public Dictionary<PolicyElement, object> CompletedValues => Values.ToDictionary(e => e.Key, e => e.Value ?? throw new InvalidOperationException($"Value not set for {e.Key.Id} of {e.Key.Parent.PrefixedName()}"));
+    public bool AllValuesSet => Values.All(e => e.Value != null || (e.Key.IsRequired().HasValue && !e.Key.IsRequired()!.Value));
+    public Dictionary<PolicyElement, object> CompletedValues => Values.ToDictionary(
+      e => e.Key, 
+      e =>
+      {
+        var result = e.Value;
+        if (result == null && e.Key.IsRequired().HasValue && !e.Key.IsRequired()!.Value)
+          result = e.Key.NullValue() ?? throw new InvalidOperationException($"Default Value not set for {e.Key.Id} of {e.Key.Parent.PrefixedName()}");
+        if (result == null)
+          throw new InvalidOperationException($"Value not set for {e.Key.Id} of {e.Key.Parent.PrefixedName()}");
+        return result;
+      });
     public Source ValuesSource { get; set; }
 
     public ElementValues(Policy policy, PolicyClass policyClass, Dictionary<PolicyElement, object?> values, Source source)
@@ -81,7 +91,7 @@ namespace LgpCore.Gpo
 
     public static Dictionary<PolicyElement, object?> DefaultValues(this Policy policy)
     {
-      return policy.Elements.ToDictionary(e => e, e => e.DefaultValue());
+      return policy.Elements.ToDictionary(e => e, e => (e.IsRequired().HasValue && !e.IsRequired()!.Value) ? null : e.DefaultValue());
     }
 
     public static Dictionary<PolicyElement, object> ValuesFromCommandLine(this Policy policy, List<(string key, List<string> values)> keyValues)

@@ -8,6 +8,7 @@
     },
     "LogLevel": {
       //set to "None" to disable logging
+      //set to "Trace" to enable more logging (especially on getting the state)
       "Default": "Debug"
     }
   }

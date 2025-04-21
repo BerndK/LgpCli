@@ -202,7 +202,10 @@ namespace LgpCli
                     {
                       menuItems.Add(new MenuItem(string.Empty, () => EditText(textBoxControl, textElement, elementValues)) { HiddenButActive = true });
                       CliTools.MarkupLine(textBoxControl.Label);
-                      CliTools.MarkupLine($"[Yellow] {menuItems.Count}[/] [[ '[White]{value}[/]' ]]");
+                      if (value != null)
+                        CliTools.MarkupLine($"[Yellow] {menuItems.Count}[/] [[ '[White]{value}[/]' ]]");
+                      else
+                        CliTools.MarkupLine($"[Yellow] {menuItems.Count}[/] [[ [White]<null>[/] ]]");
                     }
                     break;
                   }

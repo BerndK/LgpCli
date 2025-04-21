@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Text;
+using System.Xml.Linq;
 using Infrastructure;
 using LgpCore.AdmParser;
 using LgpCore.Infrastructure;
@@ -127,35 +128,42 @@ namespace LgpCore.Gpo
       var enabledList = policy.GetEnabledList();
       var disabledList = policy.GetDisabledList();
       PolicyState itemsState = PolicyState.Unknown;
-      if (enabledList.Any() || disabledList.Any())
+      context.Logger?.LogTrace($"Check enabled state of policy (simple items) {policy.PrefixedName()} {context.Class} enabledList:{enabledList.Count} disabledList:{disabledList.Count} ...");
+      using (context.Logger?.BeginScope("simple items"))
       {
-        //enabled?
-        context.Logger?.LogTrace($"Check enabled state of policy (simple items) {policy.PrefixedName()} {context.Class} ...");
-        var enabled = enabledList.GetActions(PolicyValueAction.ValueShouldExist, PolicyValueDeleteType.None)
-          .Execute(context);
-        context.Logger?.LogDebug($"Checked enabled state of policy (simple items) {policy.PrefixedName()} {context.Class} -> {enabled}");
+        if (enabledList.Any() || disabledList.Any())
+        {
+          //enabled?
+          bool enabled, disabled, notConfigured;
+          using (context.Logger?.BeginScope("Enabled"))
+          {
+            enabled = enabledList.GetActions(PolicyValueAction.ValueShouldExist, PolicyValueDeleteType.None).Execute(context);
+          }
 
-        //disabled?
-        context.Logger?.LogTrace($"Check disabled state of policy (simple items) {policy.PrefixedName()} {context.Class} ...");
-        var disabledActions = disabledList.Any()
-          ? disabledList.GetActions(PolicyValueAction.ValueShouldExist, PolicyValueDeleteType.None)
-          : enabledList.GetActions(PolicyValueAction.ValueShouldExist, PolicyValueDeleteType.DeleteValue);
-        var disabled = disabledActions
-          .Execute(context);
-        context.Logger?.LogDebug($"Checked disabled state of policy (simple items) {policy.PrefixedName()} {context.Class} -> {disabled}");
+          //disabled?
+          using (context.Logger?.BeginScope("Disabled"))
+          {
+            var disabledActions = disabledList.Any()
+              ? disabledList.GetActions(PolicyValueAction.ValueShouldExist, PolicyValueDeleteType.None)
+              : enabledList.GetActions(PolicyValueAction.ValueShouldExist, PolicyValueDeleteType.DeleteValue);
+            disabled = disabledActions.Execute(context);
+          }
 
-        //notconfigured?
-        context.Logger?.LogTrace($"Check notconfigured state of policy (simple items) {policy.PrefixedName()} {context.Class} ...");
-        var notConfiguredActions = enabledList.GetActions(PolicyValueAction.ValueShouldNotExist, PolicyValueDeleteType.None);
-        if (disabledList.Any())
-          notConfiguredActions.AddRange(disabledList.GetActions(PolicyValueAction.ValueShouldNotExist, PolicyValueDeleteType.None));
-        else
-          notConfiguredActions.AddRange(enabledList.GetActions(PolicyValueAction.ValueShouldNotExist, PolicyValueDeleteType.DeleteValue));
-        var notConfigured = notConfiguredActions
-          .Execute(context);
-        context.Logger?.LogDebug($"Checked notconfigured state of policy (simple items) {policy.PrefixedName()} {context.Class} -> {notConfigured}");
-        
-        itemsState = CalcPolicyState(enabled, disabled, notConfigured, context);
+          //notconfigured?
+          using (context.Logger?.BeginScope("NotConfigured"))
+          {
+            var notConfiguredActions =
+              enabledList.GetActions(PolicyValueAction.ValueShouldNotExist, PolicyValueDeleteType.None);
+            if (disabledList.Any())
+              notConfiguredActions.AddRange(disabledList.GetActions(PolicyValueAction.ValueShouldNotExist, PolicyValueDeleteType.None));
+            else
+              notConfiguredActions.AddRange(enabledList.GetActions(PolicyValueAction.ValueShouldNotExist, PolicyValueDeleteType.DeleteValue));
+            notConfigured = notConfiguredActions.Execute(context);
+          }
+
+          itemsState = CalcPolicyState(enabled, disabled, notConfigured, context);
+          context.Logger?.LogTrace($"Checking state of policy (simple items) {policy.PrefixedName()} {context.Class} -> enabled:{enabled} disabled:{disabled} notConfigured:{notConfigured} - itemsState:{itemsState}");
+        }
       }
 
       //the PolicyElements:
@@ -168,7 +176,16 @@ namespace LgpCore.Gpo
       { //check Elements
         PolicyState elementsState;
         var elementStates = ElementJobs
-          .Select(job => (job: job, validStates: job.GetState(context)))
+          .Select(job =>
+          {
+            using (context.Logger?.BeginScope($"{job.Element.GetType().Name} '{job.Element.Id}'"))
+            {
+              var jobStates = job.GetState(context);
+              context.Logger?.LogTrace($"State: {string.Join(", ", jobStates.Select(e => e.ToString()))}");
+              return (job: job, validStates: jobStates);
+            }
+              
+          })
           .ToList();
         //why is this so complex:
         //because there might be boolean elements with the same values for enabled and disabled (false might be delete-value)
@@ -427,7 +444,7 @@ namespace LgpCore.Gpo
     public override HashSet<PolicyState> GetState(GpoContext context)
     {
       bool enabled;
-      using (context.Logger?.BeginScope($"Enabled: {Element.GetType().Name} '{Element.Id}'"))
+      using (context.Logger?.BeginScope($"Enabled"))
       {
         var enableds = EnumElement.Items
           .Select(e =>
@@ -447,7 +464,7 @@ namespace LgpCore.Gpo
       }
 
       bool disabled;
-      using (context.Logger?.BeginScope($"Disabled: {Element.GetType().Name} '{Element.Id}'"))
+      using (context.Logger?.BeginScope($"Disabled"))
       {
         disabled = EnumElement.Items
           .SelectMany(e => e.Values.GetActions(PolicyValueAction.ValueShouldExist, PolicyValueDeleteType.DeleteValue))
@@ -455,7 +472,7 @@ namespace LgpCore.Gpo
       }
 
       bool notConfigured;
-      using (context.Logger?.BeginScope($"NotConfigured: {Element.GetType().Name} '{Element.Id}'"))
+      using (context.Logger?.BeginScope($"NotConfigured"))
       {
 
         notConfigured = EnumElement.Items
@@ -584,9 +601,8 @@ namespace LgpCore.Gpo
       bool enabled;
 
 
-      using (context.Logger?.BeginScope($"Enabled: {Element.GetType().Name} '{Element.Id}'"))
+      using (context.Logger?.BeginScope($"Enabled"))
       {
-        context.Logger?.LogDebug("Enabled:");
         bool enabledFalse = GetFalseValueItems().GetActions(PolicyValueAction.ValueShouldExist, PolicyValueDeleteType.None).Execute(context);
         bool enabledTrue = GetTrueValueItems().GetActions(PolicyValueAction.ValueShouldExist, PolicyValueDeleteType.None).Execute(context);
 
@@ -596,9 +612,8 @@ namespace LgpCore.Gpo
       }
 
       bool disabled;
-      using (context.Logger?.BeginScope($"Disabled: {Element.GetType().Name} '{Element.Id}'"))
+      using (context.Logger?.BeginScope($"Disabled"))
       {
-        context.Logger?.LogDebug("Disabled:");
         //disabled = GetAllValueItems()
         //  .GetActions(PolicyValueAction.ValueShouldExist, PolicyValueDeleteType.DeleteValue)
         disabled = GetFalseValueItems()
@@ -608,10 +623,8 @@ namespace LgpCore.Gpo
       }
 
       bool notConfigured;
-      using (context.Logger?.BeginScope($"NotConfigured: {Element.GetType().Name} '{Element.Id}'"))
+      using (context.Logger?.BeginScope($"NotConfigured"))
       {
-        context.Logger?.LogDebug("NotConfigured:");
-
         notConfigured = GetAllValueItems()
           .GetActions(PolicyValueAction.ValueShouldNotExist, PolicyValueDeleteType.None)
           .Concat(GetAllValueItems().GetActions(PolicyValueAction.ValueShouldNotExist, PolicyValueDeleteType.DeleteValue))
@@ -767,21 +780,23 @@ namespace LgpCore.Gpo
     public override HashSet<PolicyState> GetState(GpoContext context)
     {
       //getting raw values, is null if the key not exists
-      var rawValues = GetValueRaw(context, out var invalidValueNames, out bool delValsExists, out var otherValuesExists);
+      var rawValues = GetValueRaw(context, out var invalidValueNames, out bool delValsExists,
+        out var otherValuesExists);
+      context.Logger?.LogTrace($"rawValues:{rawValues?.Count} invalidValueNames:{invalidValueNames?.Count} delValsExists:{delValsExists} otherValuesExists:{otherValuesExists}");
       if (invalidValueNames != null && invalidValueNames.Any())
         return new HashSet<PolicyState> {PolicyState.Suspect};
 
       if (rawValues == null || rawValues.Count == 0)
-        return new HashSet<PolicyState> { PolicyState.NotConfigured };
+        return new HashSet<PolicyState> {PolicyState.NotConfigured};
 
       //Check Values
 
       if (ListElement.Additive && delValsExists && otherValuesExists)
-        return new HashSet<PolicyState> { PolicyState.Suspect };
+        return new HashSet<PolicyState> {PolicyState.Suspect};
 
-      return otherValuesExists 
-        ? new HashSet<PolicyState> { PolicyState.Enabled }
-        : new HashSet<PolicyState> { PolicyState.Disabled };
+      return otherValuesExists
+        ? new HashSet<PolicyState> {PolicyState.Enabled}
+        : new HashSet<PolicyState> {PolicyState.Disabled};
     }
 
     private List<KeyValuePair<string, string>>? GetValueRaw(
