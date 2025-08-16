@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Win32;
 
 namespace LgpCli
 {
@@ -114,7 +115,8 @@ namespace LgpCli
           menuItems.Add("GD", "Get default values", () => elementValues?.SetDefaults()); 
           menuItems.Add("GB", "Get Values from current batch file", () => GetValuesFromBatchFile(serviceProvider, elementValues!, false), () => true);
           menuItems.Add("B", "Build Commandline for this policy", () => BuildCommandLineText(serviceProvider, policy, policyClass, elementValues), () => state != PolicyState.Unknown);
-          menuItems.Add("RS", "Report all settings in registry", () => MainCli.ReportSettingsRegistry(policyClass), () => true);
+          menuItems.Add("RS", "Report all GPO settings in registry", () => MainCli.ReportGpoSettingsRegistry(policyClass), () => true);
+          menuItems.Add("RR", "Report registry settings for this policy", () => ReportRegistrySettings(serviceProvider, policy, policyClass), () => true);
           menuItems.Add("R", "Refresh", () => {}, () => true);
           
           menuItems.Add("Esc", "Exit", () => { loop = false; });
@@ -354,5 +356,66 @@ namespace LgpCli
       } while (loop);
     }
 
+    private static void ReportRegistrySettings(IServiceProvider serviceProvider, Policy policy, PolicyClass policyClass)
+    {
+      var policyStates = new List<PolicyState>
+      {
+        PolicyState.Enabled,
+        PolicyState.Disabled,
+        PolicyState.NotConfigured,
+      };
+
+      if (CliTools.SelectItem(policyStates, "Select a state to be reported", PolicyState.Enabled, out var policyState, state => state.ToString()))
+      {
+        var groups = policy.ReportRegistrySettings(policyClass, policyState)
+          .GroupBy(e => e.element, e => e.action);
+
+        using var rootReg = policyClass switch
+        {
+          PolicyClass.Machine => Registry.LocalMachine,
+          PolicyClass.User => Registry.CurrentUser,
+          _ => throw new ArgumentOutOfRangeException(nameof(policyClass), policyClass, "Invalid PolicyClass for registry reporting")
+        };
+
+        CliTools.WarnMessage("This feature is in BETA. Don't write registry values directly to set Policies! Use 'Enable' to set a policy!", false);
+        Console.WriteLine();
+
+        foreach (var group in groups)
+        {
+          Console.WriteLine($"{(group.Key == null ? "<simple items>" : $"{group.Key!.GetType().Name}:'{group.Key!.Id}'")}");
+          var items = group;
+          foreach (var item in items)
+          {
+            //items per element
+            var sAction = item.PolicyValueDeleteType switch
+            {
+              PolicyValueDeleteType.None => "SetValue",
+              PolicyValueDeleteType.DeleteValue => "DeleteValue",
+              PolicyValueDeleteType.DeleteValues => "DeleteKey",
+              _ => throw new ArgumentOutOfRangeException()
+            };
+            var sValue = item.PolicyValueDeleteType switch
+            {
+              PolicyValueDeleteType.None => item.Value?.ToString(),
+              _ => "<null>"
+            };
+
+            //current Value
+            using var regKey = rootReg.OpenSubKey(item.RegKey, false);
+            var regValue = regKey?.GetValue(item.RawRegValueName, null);
+            var regValueKind = regValue != null && regKey != null
+              ? regKey.GetValueKind(item.RawRegValueName)
+              : RegistryValueKind.Unknown;
+            var sCurrentRegValue = regValue != null 
+              ? $"'{regValue}' ({regValueKind})"
+              : "<null>";
+
+            //Console.WriteLine($"  {item.Action}: {item.RegKey}|{item.RegValueName} '{item.Value ?? "<null>"}' ({item.ValueKind})");
+            Console.WriteLine($"  {sAction,-11}: {item.RegKey}|{item.RawRegValueName} '{item.Value ?? "<null>"}' ({item.RawValueKind}) Current:{sCurrentRegValue}");
+          }
+        }
+        CliTools.EnterToContinue();
+      }
+    }
   }
 }

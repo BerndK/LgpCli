@@ -116,5 +116,11 @@ namespace LgpCore.Gpo
         }
       });
     }
+
+    public static List<(PolicyElement? element, PolicyValueItemAction action)> ReportRegistrySettings(this Policy policy, PolicyClass policyClass, PolicyState policyState)
+    {
+      var job = new PolicyJob(policy);
+      return job.ReportRegistrySettings(policyState);
+    }
   }
 }

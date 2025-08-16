@@ -7,17 +7,33 @@
       "commandName": "Project",
       "commandLineArgs": "interactive show bits.BITS_SetTransferPolicyOnCostedNetwork machine"
     },
+    "Enum2": {
+      "commandName": "Project",
+      "commandLineArgs": "interactive show windows.EnableSmartScreen machine"
+    },
     "Enum (Explorer Ribbon)": {
       "commandName": "Project",
       "commandLineArgs": "interactive show windows.ExplorerRibbonStartsMinimized User"
+    },
+    "DecimalElement (storeAsText)": {
+      "commandName": "Project",
+      "commandLineArgs": "interactive show controlpaneldisplay.CPL_Personalization_ScreenSaverTimeOut User"
     },
     "MultiText": {
       "commandName": "Project",
       "commandLineArgs": "interactive show inetres.SiteDiscoveryDomainAllowList User"
     },
+    "TextElement": {
+      "commandName": "Project",
+      "commandLineArgs": "interactive show inetres.BackgroundColorPol User"
+    },
     "Boolean": {
       "commandName": "Project",
       "commandLineArgs": "interactive show inetres.MediaSettings User"
+    },
+    "No items": {
+      "commandName": "Project",
+      "commandLineArgs": "interactive show windows.NoCDBurning User"
     },
     "CommandSearch": {
       "commandName": "Project",

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Security.AccessControl;
 using System.Text;
 using System.Xml.Linq;
 using Infrastructure;
@@ -240,6 +241,51 @@ namespace LgpCore.Gpo
 
       return ElementJobs.ToDictionary(e => e.Element, e => e.GetValue(context));
     }
+
+    public List<(PolicyElement? element, PolicyValueItemAction action)> ReportRegistrySettings(PolicyState policyState)
+    {
+      //simple policy items
+      var enabledList = policy.GetEnabledList();
+      var disabledList = policy.GetDisabledList();
+
+      List<PolicyValueItemAction> actions;
+      switch (policyState)
+      {
+        case PolicyState.Enabled:
+          actions = enabledList.GetActions(PolicyValueAction.SetValue, PolicyValueDeleteType.None);
+          break;
+        case PolicyState.Disabled:
+          actions = disabledList.Any()
+            ? disabledList.GetActions(PolicyValueAction.SetValue, PolicyValueDeleteType.None)
+            : enabledList.GetActions(PolicyValueAction.SetValue, PolicyValueDeleteType.DeleteValue);
+          break;
+        case PolicyState.NotConfigured:
+          actions = enabledList.GetActions(PolicyValueAction.RemoveValue, PolicyValueDeleteType.None);
+          if (disabledList.Any())
+            actions.AddRange(disabledList.GetActions(PolicyValueAction.RemoveValue, PolicyValueDeleteType.None));
+          else
+            actions.AddRange(enabledList.GetActions(PolicyValueAction.RemoveValue, PolicyValueDeleteType.DeleteValue));
+          break;
+
+        case PolicyState.Unknown:
+        case PolicyState.Suspect:
+        default:
+          throw new ArgumentOutOfRangeException(nameof(policyState), policyState, null);
+      }
+
+      var result = actions
+        .Select(a => (element: (PolicyElement?)null, action: a))
+        .ToList();
+
+      //elements
+      foreach (var elementJob in ElementJobs)
+      {
+        result.AddRange(elementJob.ReportRegistrySettings(policyState)
+          .Select(a => (element: (PolicyElement?)elementJob.Element, action: a)));
+      }
+
+      return result;
+    }
   }
 
   public abstract class PolicyElementJobBase : PolicyJobBase
@@ -399,6 +445,64 @@ namespace LgpCore.Gpo
       }
       return null;
     }
+
+    public virtual List<PolicyValueItemAction> ReportRegistrySettings(PolicyState policyState)
+    {
+      List<PolicyValueItemAction> actions;
+      switch (policyState)
+      {
+        case PolicyState.Enabled:
+          actions = new List<PolicyValueItemAction>()
+          {
+            new PolicyValueItemAction(
+              PolicyValueAction.SetValue,
+              RegKey,
+              RegValueName,
+              ValueKind,
+              null,
+              PolicyValueDeleteType.None)
+          };
+          break;
+        case PolicyState.Disabled:
+          actions = new List<PolicyValueItemAction>()
+          {
+            new PolicyValueItemAction(
+              PolicyValueAction.SetValue,
+              RegKey,
+              RegValueName,
+              RegistryValueKind.None,
+              null,
+              PolicyValueDeleteType.DeleteValue)
+          };
+        break;
+        case PolicyState.NotConfigured:
+          actions = new List<PolicyValueItemAction>()
+          {
+            new PolicyValueItemAction(
+              PolicyValueAction.RemoveValue,
+              RegKey,
+              RegValueName,
+              RegistryValueKind.None,
+              null,
+              PolicyValueDeleteType.None),
+            new PolicyValueItemAction(
+              PolicyValueAction.RemoveValue,
+              RegKey,
+              RegValueName,
+              RegistryValueKind.None,
+              null,
+              PolicyValueDeleteType.DeleteValue)
+          };
+          break;
+
+        case PolicyState.Unknown:
+        case PolicyState.Suspect:
+        default:
+          throw new ArgumentOutOfRangeException(nameof(policyState), policyState, null);
+      }
+
+      return actions;
+    }
   }
 
   public class PolicyEnumElementJob : PolicyElementJobBase
@@ -498,14 +602,38 @@ namespace LgpCore.Gpo
         return null;
       return enableds.First(e => e.allSuccess).sEnumValue;
     }
+
+    public override List<PolicyValueItemAction> ReportRegistrySettings(PolicyState policyState)
+    {
+      List<PolicyValueItemAction> actions;
+      switch (policyState)
+      {
+        case PolicyState.Enabled:
+          actions = EnumElement.Items.SelectMany(ei => ei.Values.GetActions(PolicyValueAction.SetValue, PolicyValueDeleteType.None)).ToList();
+          break;
+        case PolicyState.Disabled:
+          actions = EnumElement.Items.SelectMany(ei => ei.Values.GetActions(PolicyValueAction.SetValue, PolicyValueDeleteType.DeleteValue)).ToList();
+          break;
+        case PolicyState.NotConfigured:
+          actions = EnumElement.Items.SelectMany(ei => ei.Values.GetActions(PolicyValueAction.RemoveValue, PolicyValueDeleteType.None))
+            .Concat(EnumElement.Items.SelectMany(ei => ei.Values.GetActions(PolicyValueAction.RemoveValue, PolicyValueDeleteType.DeleteValue)))
+            .ToList();
+          break;
+
+        case PolicyState.Unknown:
+        case PolicyState.Suspect:
+        default:
+          throw new ArgumentOutOfRangeException(nameof(policyState), policyState, null);
+      }
+      return actions;
+    }
   }
 
   public class PolicyDecimalElementJob : PolicyElementJobBase
   {
     public DecimalElement DecimalElement => (DecimalElement)Element;
     public PolicyDecimalElementJob(DecimalElement policyElement) : base(policyElement)
-    {
-    }
+    { }
 
     public override RegistryValueKind ValueKind => DecimalElement.StoreAsText ? RegistryValueKind.String : RegistryValueKind.DWord;
     public override Type ValueType => typeof(uint);
@@ -649,6 +777,31 @@ namespace LgpCore.Gpo
         : null;
     }
 
+    public override List<PolicyValueItemAction> ReportRegistrySettings(PolicyState policyState)
+    {
+      List<PolicyValueItemAction> actions = new List<PolicyValueItemAction>();
+      switch (policyState)
+      {
+        case PolicyState.Enabled:
+          actions.AddRange(GetTrueValueItems().GetActions(PolicyValueAction.SetValue, PolicyValueDeleteType.None));
+          actions.AddRange(GetFalseValueItems().GetActions(PolicyValueAction.SetValue, PolicyValueDeleteType.None));
+          break;
+        case PolicyState.Disabled:
+          actions.AddRange(GetFalseValueItems().GetActions(PolicyValueAction.SetValue, PolicyValueDeleteType.None));
+          break;
+        case PolicyState.NotConfigured:
+          actions.AddRange(GetAllValueItems()
+            .GetActions(PolicyValueAction.RemoveValue, PolicyValueDeleteType.None)
+            .Concat(GetAllValueItems().GetActions(PolicyValueAction.RemoveValue, PolicyValueDeleteType.DeleteValue)));
+          break;
+
+        case PolicyState.Unknown:
+        case PolicyState.Suspect:
+        default:
+          throw new ArgumentOutOfRangeException(nameof(policyState), policyState, null);
+      }
+      return actions;
+    }
   }
 
   public class PolicyTextElementJob : PolicyElementJobBase
@@ -862,6 +1015,8 @@ namespace LgpCore.Gpo
     public const string DeleteValuesPrefix = "**delvals.";
     public PolicyValueItemAction(PolicyValueAction action, string regKey, string regValueName, RegistryValueKind valueKind, object? value, PolicyValueDeleteType deleteType)
     {
+      RawRegValueName = regValueName;
+      RawValueKind = valueKind;
       switch (deleteType)
       {
         case PolicyValueDeleteType.None:
@@ -882,13 +1037,17 @@ namespace LgpCore.Gpo
       RegKey = regKey;
       RegValueName = regValueName;
       ValueKind = valueKind;
+      PolicyValueDeleteType = deleteType;
       Value = value;
     }
 
     public PolicyValueAction Action { get; }
     public string RegKey { get; }
     public string RegValueName { get; }
+    public string RawRegValueName { get; }
     public RegistryValueKind ValueKind { get; }
+    public RegistryValueKind RawValueKind { get; }
+    public PolicyValueDeleteType PolicyValueDeleteType { get; }
     public object? Value { get; }
 
     public bool Execute(GpoContext context)

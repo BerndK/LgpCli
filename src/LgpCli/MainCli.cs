@@ -53,7 +53,7 @@ namespace LgpCli
           menuItems.Add("T", "Show Policy Category Tree", () => ShowPolicyCategoryTree(serviceProvider), () => true);
 
           menuItems.Add("A", "Report state for All policies", () => ReportStates(serviceProvider, admFolder), () => true);
-          menuItems.Add("RS", "Report all settings in registry", () => ReportSettingsRegistry(), () => true);
+          menuItems.Add("RS", "Report all GPO settings in registry", () => ReportGpoSettingsRegistry(), () => true);
 
           menuItems.Add("M", "Manage Command File", () => ManageCommandFile(serviceProvider), () => true);
           menuItems.Add("CL", "Change Language", () => ChangeLanguge(serviceProvider), () => true);
@@ -142,14 +142,14 @@ namespace LgpCli
       CliTools.ShowMenu(null, menuItems.ToArray());
     }
 
-    public static void ReportSettingsRegistry()
+    public static void ReportGpoSettingsRegistry()
     {
       if (!SelectPolicyClass(false, out var policyClass))
         return;
-      ReportSettingsRegistry(policyClass);
+      ReportGpoSettingsRegistry(policyClass);
     }
 
-    public static void ReportSettingsRegistry(PolicyClass policyClass)
+    public static void ReportGpoSettingsRegistry(PolicyClass policyClass)
     {
       policyClass.CheckClassIsNotBoth();
       var section = policyClass == PolicyClass.User
