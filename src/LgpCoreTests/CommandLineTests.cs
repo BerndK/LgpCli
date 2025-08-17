@@ -22,7 +22,7 @@ namespace LgpCoreTests
     public void CmdTest(string args)
     {
       var commandLine = new CommandLine(null);
-      commandLine.Build(ServiceProvider);
+      commandLine.BuildParser(ServiceProvider);
       commandLine.EnableCommand.SetHandler(HandleEnable);
       var parseResult = commandLine.Parser.Parse(args);
       Console.WriteLine($"'{args}'");
@@ -48,7 +48,7 @@ namespace LgpCoreTests
     public void BatchCmdInfoTest(string args)
     {
       var commandLine = new CommandLine(null);
-      commandLine.Build(ServiceProvider);
+      commandLine.BuildParser(ServiceProvider);
       var info = BatchCmd.ParseCommandLine(commandLine.Parser, string.Join(' ', args), 0);
       
       Console.WriteLine($"Command:'{info.CommandName}' Policy:{info.PolicyPrefixedName} {info.PolicyClass}");

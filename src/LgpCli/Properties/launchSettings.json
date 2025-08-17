@@ -57,7 +57,7 @@
     },
     "CommandBatch": {
       "commandName": "Project",
-      "commandLineArgs": "batch \"C:\\Program Files\\test.lgp\" -coe"
+      "commandLineArgs": "batch \"D:\\Projects\\BK\\LgpCli.github\\src\\LgpCli\\bin\\Debug\\net9.0-windows\\BatchCommands.lgp\" -coe"
     }
   }
 }

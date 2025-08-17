@@ -117,6 +117,28 @@ namespace LgpCore.Gpo
       });
     }
 
+    public static string BuildCommand(this Policy policy, PolicyClass policyClass, PolicyCommandType policyCommandType, ElementValues? elementValues)
+    {
+      var command = policyCommandType switch
+      {
+        PolicyCommandType.Enable => CommandLine.CommandNameEnable,
+        PolicyCommandType.Disable => CommandLine.CommandNameDisable,
+        PolicyCommandType.NotConfigure => CommandLine.CommandNameNotConfigure,
+        PolicyCommandType.GetState => CommandLine.CommandNameGetState,
+        _ => throw new ArgumentOutOfRangeException(nameof(policyCommandType), policyCommandType, null)
+      };
+      var exeName = Path.GetFileNameWithoutExtension(Environment.ProcessPath);
+      var result = $"{exeName} {command} {policy.PrefixedName()} {policyClass}";
+      if (policyCommandType == PolicyCommandType.Enable)
+      {
+        if (elementValues == null)
+          throw new ArgumentNullException(nameof(elementValues), "Element values must be provided for enabling a policy.");
+
+        result += elementValues!.CompletedValues.ValuesToCommandLine();
+      } 
+      return result;
+    }
+
     public static List<(PolicyElement? element, PolicyValueItemAction action)> ReportRegistrySettings(this Policy policy, PolicyClass policyClass, PolicyState policyState)
     {
       var job = new PolicyJob(policy);

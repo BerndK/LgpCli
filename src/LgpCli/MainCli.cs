@@ -8,6 +8,8 @@ using Infrastructure;
 using LgpCore.AdmParser;
 using LgpCore.Gpo;
 using LgpCore.Infrastructure;
+using LgpCore;
+using System.CommandLine;
 
 namespace LgpCli
 {
@@ -54,11 +56,11 @@ namespace LgpCli
 
           menuItems.Add("A", "Report state for All policies", () => ReportStates(serviceProvider, admFolder), () => true);
           menuItems.Add("RS", "Report all GPO settings in registry", () => ReportGpoSettingsRegistry(), () => true);
+          menuItems.Add("BM", "Build Commandline for multiple policies", () => BuildCommandLineTexts(serviceProvider, admFolder), () => true);
 
           menuItems.Add("M", "Manage Command File", () => ManageCommandFile(serviceProvider), () => true);
           menuItems.Add("CL", "Change Language", () => ChangeLanguge(serviceProvider), () => true);
           menuItems.Add(new MenuItem("DebugDI", "DebugDI", () => DebugDi(serviceProvider), () => true) {HiddenButActive = true});
-
           menuItems.Add("Esc", "Exit", () => { loop = false; });
 
           CliTools.ShowMenu(null, menuItems.ToArray());
@@ -170,6 +172,68 @@ namespace LgpCli
         menuItems.Add("Esc", "Exit", () => { loop = false; });
         CliTools.ShowMenu(null, menuItems.ToArray());
       } while (loop);
+    }
+
+    private static void BuildCommandLineTexts(IServiceProvider serviceProvider, AdmFolder admFolder)
+    {
+      var states = admFolder.AllPolicies.Values.GetStates();
+      var countStates = states.CountBy(e => e.state).ToDictionary();
+      CliTools.MarkupLine($"{admFolder.AllPolicies.Count} [Policy]Policies[/] - {states.Count} States: [Enable]Enabled[/]:{countStates.GetValueOrDefault(PolicyState.Enabled, 0)} [Disable]Disabled[/]:{countStates.GetValueOrDefault(PolicyState.Disabled, 0)} [NotConfigure]NotConfigured[/]:{countStates.GetValueOrDefault(PolicyState.NotConfigured, 0)}");
+
+      var statesToHandle = states.Where(e => e.state is PolicyState.Enabled or PolicyState.Disabled).ToList();
+      if (CliTools.SelectMultipleItems(statesToHandle, false, "Select policies to build commands lines for", out var selectedStates,
+            item => $"{PolicyCli.StateMarkupString(item.state)} for [PrefixedName]{item.policy.PrefixedName()}[/] ([Class]{item.policyClass}[/]) [Title]{item.policy.DisplayNameResolved()}[/]"))
+      {
+        var cmds = new List<string>();
+        foreach (var (policy, policyClass, state) in selectedStates)
+        {
+          switch (state)
+          {
+            case PolicyState.Enabled:
+            {
+              var cmd = policy.BuildCommand(policyClass, PolicyCommandType.Enable, ElementValues.CurrentOnSystem(policy, policyClass));
+              Console.WriteLine(cmd);
+              cmds.Add(cmd);
+              break;
+            }
+            case PolicyState.Disabled:
+            {
+              var cmd = policy.BuildCommand(policyClass, PolicyCommandType.Disable, null);
+              Console.WriteLine(cmd);
+              cmds.Add(cmd);
+              break;
+            }
+            case PolicyState.Unknown:
+            case PolicyState.NotConfigured:
+            case PolicyState.Suspect:
+            default:
+              throw new ArgumentOutOfRangeException();
+          }
+        }
+
+        if (cmds.Any())
+        {
+          var batchCmd = serviceProvider.GetRequiredService<BatchCmd>();
+          if (batchCmd.CanWrite.GetValueOrDefault() && CliTools.BooleanQuestion($"Do you want to add this command to command file: {batchCmd.CurrentFile?.Name}", out var addCommand) && addCommand)
+          {
+            if (batchCmd.AddCommands(cmds, out var status))
+            {
+              CliTools.SuccessMessage("Successfully Added.");
+            }
+            else
+            {
+              CliTools.ErrorMessage($"Error: {status}");
+            }
+          }
+          else
+          {
+            CliTools.EnterToContinue();
+          }
+        }
+        else
+          CliTools.EnterToContinue();
+      }
+
     }
 
     private static void ManageCommandFile(IServiceProvider serviceProvider)

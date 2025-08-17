@@ -56,8 +56,8 @@ namespace LgpCli
           PolicyState state;
           try
           {
-            var logger = serviceProvider.GetService<ILogger<PolicyJob>>();
-            state = policy.GetState(policyClass, logger);
+            var poilicyJobLogger = serviceProvider.GetService<ILogger<PolicyJob>>();
+            state = policy.GetState(policyClass, poilicyJobLogger);
 
             CliTools.MarkupLine($"State:{StateMarkupString(state)}");
 
@@ -70,10 +70,10 @@ namespace LgpCli
                 if (policyValues != null)
                   elementValues = new ElementValues(policy, policyClass, policyValues, ElementValues.Source.CurrentOnSystem);
                 else
-                  elementValues = policy.Defaults(policyClass);
+                  elementValues = policy.DefaultElementValues(policyClass);
               }
               else
-                elementValues = policy.Defaults(policyClass);
+                elementValues = policy.DefaultElementValues(policyClass);
 
               //try to get values from current BatchFile
               if (elementValues.ValuesSource == ElementValues.Source.Defaults)
@@ -302,19 +302,13 @@ namespace LgpCli
 
     private static void BuildCommandLineText(IServiceProvider serviceProvider, Policy policy, PolicyClass policyClass, ElementValues? elementValues)
     {
-      string BuildCommand(string command)
+      void HandleCommand(PolicyCommandType policyCommandType)
       {
-        var exeName = Path.GetFileNameWithoutExtension(Environment.ProcessPath);
-        return $"{exeName} {command} {policy.PrefixedName()} {policyClass}";
-      }
-
-      void HandleCommand(string command, string? values)
-      {
-        var cmd = BuildCommand(command) + values;
+        var cmd = policy.BuildCommand(policyClass, policyCommandType, elementValues);
         Console.WriteLine(cmd);
         
         var batchCmd = serviceProvider.GetRequiredService<BatchCmd>();
-        if (batchCmd.CanWrite.GetValueOrDefault() && CliTools.BooleanQuestion($"Do you want to add this command to commandfile: {batchCmd.CurrentFile?.Name}", out var addCommand) && addCommand)
+        if (batchCmd.CanWrite.GetValueOrDefault() && CliTools.BooleanQuestion($"Do you want to add this command to command file: {batchCmd.CurrentFile?.Name}", out var addCommand) && addCommand)
         {
           if (batchCmd.AddCommand(cmd, out var status))
           {
@@ -331,23 +325,16 @@ namespace LgpCli
         }
         
       }
-      void BuildEnableCommand() => HandleCommand(CommandLine.CommandNameEnable, elementValues!.CompletedValues.ValuesToCommandLine());
-
-      void BuildDisableCommand() => HandleCommand(CommandLine.CommandNameDisable, null);
-
-      void BuildNotConfigureCommand() => HandleCommand(CommandLine.CommandNameNotConfigure, null);
-
-      void BuildGetStateCommand() => HandleCommand(CommandLine.CommandNameGetState, null);
 
       bool loop = false;
       do
       {
         loop = false; //exit the loop by default
         var menuItems = new List<MenuItem>();
-        menuItems.Add("E", "[Enable]Enable[/] Policy", BuildEnableCommand, () => elementValues != null && elementValues.AllValuesSet);
-        menuItems.Add("D", "[Disable]Disable[/] Policy", BuildDisableCommand);
-        menuItems.Add("N", "[NotConfigure]NotConfigure[/] Policy", BuildNotConfigureCommand);
-        menuItems.Add("G", "[GetState]Get State of Policy[/]", BuildGetStateCommand);
+        menuItems.Add("E", "[Enable]Enable[/] Policy", () => HandleCommand(PolicyCommandType.Enable), () => elementValues != null && elementValues.AllValuesSet);
+        menuItems.Add("D", "[Disable]Disable[/] Policy", () => HandleCommand(PolicyCommandType.Disable));
+        menuItems.Add("N", "[NotConfigure]NotConfigure[/] Policy", () => HandleCommand(PolicyCommandType.NotConfigure));
+        menuItems.Add("G", "[GetState]Get State of Policy[/]", () => HandleCommand(PolicyCommandType.GetState));
         
         menuItems.Add("Esc", "Cancel", () => { });
 

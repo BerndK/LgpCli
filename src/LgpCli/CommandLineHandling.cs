@@ -37,7 +37,7 @@ namespace LgpCli
       commandLine.BatchCommand.SetHandler(HandleBatchCommand);
 
       //start
-      commandLine.Build(serviceProvider);
+      commandLine.BuildParser(serviceProvider);
       var parseResult = commandLine.Parser.Parse(args);
       logger.LogInformation($"Command Line: {parseResult}");
       parseResult.Invoke();
@@ -52,7 +52,11 @@ namespace LgpCli
       CliTools.MarkupLine($"[Title]{appInfo.Title}[/] [DarkGreen]{appInfo.Ver}[/] ({appInfo.Copyright}) - {appInfo.Desc} [[{(appInfo.IsAdmin ? "[Green]admin[/]" : "[Red]not admin[/]")}]]");
     }
 
-    private static void HandleGetStateCommand(IServiceProvider serviceProvider, string policyPrefixedName, PolicyClass? policyClassNullable)
+    private static void HandleGetStateCommand(IServiceProvider serviceProvider, string policyPrefixedName,  PolicyClass? policyClassNullable)
+    {
+      HandleGetStateCommandWithPrefix(serviceProvider, policyPrefixedName, policyClassNullable, null);
+    }
+    private static void HandleGetStateCommandWithPrefix(IServiceProvider serviceProvider, string policyPrefixedName, PolicyClass? policyClassNullable, string? prefix)
     {
       Greeting(serviceProvider);
 
@@ -68,8 +72,7 @@ namespace LgpCli
       void ReportState(PolicyClass policyClass)
       {
         var state = policy.GetState(policyClass, logger);
-        CliTools.MarkupLine(
-          $"State:{PolicyCli.StateMarkupString(state)} for [PrefixedName]{policy.PrefixedName()}[/] ([Class]{policyClass}[/]) [Title]{policy.DisplayNameResolved()}[/]");
+        CliTools.MarkupLine($"{prefix}State:{PolicyCli.StateMarkupString(state)} for [PrefixedName]{policy.PrefixedName()}[/] ([Class]{policyClass}[/]) [Title]{policy.DisplayNameResolved()}[/]");
         if (state == PolicyState.Enabled)
         {
           var elementValues = ElementValues.CurrentOnSystem(policy, policyClass);
@@ -111,25 +114,27 @@ namespace LgpCli
 
       var policyClass = policyClassNullable.Value;
       CliTools.MarkupLine($"{actionText} [Policy]Policy[/] [PrefixedName]{policy.PrefixedName()}[/] ([Class]{policyClass}[/]) [Title]{policy.DisplayNameResolved()}[/]");
+      
+      policyPreAction?.Invoke(policy, policyClass);
+
       if (getStateMode is CommandLine.GetStateMode.Before or CommandLine.GetStateMode.Both)
       {
-        HandleGetStateCommand(serviceProvider, policyPrefixedName, policyClass);
+        HandleGetStateCommandWithPrefix(serviceProvider, policyPrefixedName, policyClass, "Old");
       }
 
-      policyPreAction?.Invoke(policy, policyClass);
       Console.WriteLine("action...");
       policyAction(policy, policyClass, logger);
 
       if (getStateMode is CommandLine.GetStateMode.After or CommandLine.GetStateMode.Both)
       {
-        HandleGetStateCommand(serviceProvider, policyPrefixedName, policyClass);
+        HandleGetStateCommandWithPrefix(serviceProvider, policyPrefixedName, policyClass, "New");
       }
     }
 
     private static void HandleEnableCommand(IServiceProvider serviceProvider, string policyPrefixedName, PolicyClass? policyClassNullable, List<(string, List<string>)> elemArgs, CommandLine.GetStateMode getStateMode)
     {
       HandlePolicyCommand(serviceProvider, policyPrefixedName, policyClassNullable, getStateMode, 
-        "[Enable]Enable[/]", (policy, policyClass, logger) =>
+        "Command :[Enable]Enable[/]", (policy, policyClass, logger) =>
         {
           var elementValues = ElementValues.FromCommandLine(policy, policyClass, elemArgs);
           policy.Enable(policyClass, elementValues.CompletedValues, logger);
@@ -143,14 +148,14 @@ namespace LgpCli
 
     private static void HandleDisableCommand(IServiceProvider serviceProvider, string policyPrefixedName, PolicyClass? policyClassNullable, CommandLine.GetStateMode getStateMode)
     {
-      HandlePolicyCommand(serviceProvider, policyPrefixedName, policyClassNullable, getStateMode, 
-        "[Disable]Disable[/]", (policy, policyClass, logger) => policy.Disable(policyClass, logger));
+      HandlePolicyCommand(serviceProvider, policyPrefixedName, policyClassNullable, getStateMode,
+        "Command :[Disable]Disable[/]", (policy, policyClass, logger) => policy.Disable(policyClass, logger));
     }
 
     private static void HandleNotConfigureCommand(IServiceProvider serviceProvider, string policyPrefixedName, PolicyClass? policyClassNullable, CommandLine.GetStateMode getStateMode)
     {
       HandlePolicyCommand(serviceProvider, policyPrefixedName, policyClassNullable, getStateMode,
-        "[NotConfigure]NotConfigure[/]", (policy, policyClass, logger) => policy.NotConfigure(policyClass, logger));
+        "Command :[NotConfigure]NotConfigure[/]", (policy, policyClass, logger) => policy.NotConfigure(policyClass, logger));
     }
 
     public static void HandleShowCommand(IServiceProvider serviceProvider, string policyPrefixedName, PolicyClass? policyClass)

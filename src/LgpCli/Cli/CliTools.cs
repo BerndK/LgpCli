@@ -578,6 +578,11 @@ namespace Cli
         CliTools.EnterToContinue();
     }
 
+    public static void WriteLine(string? message)
+    {
+      Console.WriteLine(message);
+    }
+
     public static void WriteLine(ConsoleColor color, string? message)
     {
       using (color.Switch())
@@ -777,6 +782,67 @@ namespace Cli
       return success;
     }
 
+    public static bool SelectMultipleItems<T>(IEnumerable<T> items, bool defaultSelected, string selectOptionText, [NotNullWhen(true)] out List<T>? selectedItems, Func<T, string?> textFunc, MenuSettings? settings = null)
+    {
+      var selectableTages = items.Select(e => new SelectableTag<T>(defaultSelected, e)).ToList();
+      var result = SelectMultipleItems(selectableTages, selectOptionText, textFunc, settings);
+      if (result)
+      {
+        selectedItems = selectableTages
+          .Where(e => e.Selected)
+          .Select(e => e.Value)
+          .ToList();
+      }
+      else
+      {
+        selectedItems = null;
+      }
+      return result;
+    }
+
+    public static bool SelectMultipleItems<T>(List<SelectableTag<T>> items, string selectOptionText, Func<T, string?> textFunc, MenuSettings? settings = null)
+    {
+      while (true)
+      {
+        var escItem = new MenuItem("Esc", "Cancel", null);
+        var menuItems = new List<MenuItem>();
+        foreach (var selectableTag in items)
+        {
+          menuItems.AddCheckBox(null, textFunc(selectableTag.Value) ?? string.Empty, selectableTag);
+        }
+        menuItems.AddSeparator("--- selection functions ---");
+        menuItems.Add("S", "Select all items", () =>
+        {
+          foreach (var selectableTag in items)
+            selectableTag.Selected = true;
+        });
+        menuItems.Add("D", "Deselect all items", () =>
+        {
+          foreach (var selectableTag in items)
+            selectableTag.Selected = false;
+        });
+        menuItems.Add("T", "Toggle selection of all items", () =>
+        {
+          foreach (var selectableTag in items)
+            selectableTag.Selected = !selectableTag.Selected;
+        });
+        var okItem = new MenuItem("OK", "Use this selection", null);
+        menuItems.Add(okItem);
+        menuItems.Add(escItem);
+
+        var defaultIndex = -1;
+        var selected = ShowMenu(selectOptionText, defaultIndex, settings ?? new MenuSettings(), menuItems.ToArray());
+        if (selected == escItem)
+        {
+          return false;
+        }
+        if (selected == okItem)
+        {
+          return true;
+        }
+      }
+    }
+
     public static List<MenuItem> BuildMenuItemsWithText<T>(IEnumerable<T> items, Func<T, string?> textFunc)
     {
       return items
@@ -875,14 +941,14 @@ namespace Cli
 
     public class SelectableTag<T>
     {
-      public SelectableTag(bool selected, T? value)
+      public SelectableTag(bool selected, T value)
       {
         Selected = selected;
         Value = value;
       }
 
       public bool Selected { get; set; }
-      public T? Value { get; set; }
+      public T Value { get; set; }
     }
 
     #region Markup

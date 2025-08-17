@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging.Debug;
 
 namespace LgpCoreTests
 {
-  public class ServicedTestBase
+  public abstract class ServicedTestBase
   {
     private ServiceProvider? serviceProvider;
     public IServiceProvider ServiceProvider => serviceProvider ?? throw new InvalidOperationException();

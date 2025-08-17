@@ -213,10 +213,25 @@ namespace LgpCore
       //}, serviceProviderBinder, policyArgument, policyClassArgument);
     }
 
-    public Parser Build(IServiceProvider serviceProvider, Action<CommandLineBuilder>? configureBuilder = null)
+    public Parser BuildParser(IServiceProvider serviceProvider, Action<CommandLineBuilder>? configureBuilder = null)
     {
+      //only Build once, so we can use the same parser multiple times (don't register the same items multiple times)
+      if (parser != null)
+        return parser;
+
       builder = new CommandLineBuilder(RootCommand)
         .UseDefaults()
+        //.UseVersionOption()
+        //.UseHelp()
+        //.UseEnvironmentVariableDirective()
+        //.UseParseDirective()
+        //.UseSuggestDirective()
+        //.RegisterWithDotnetSuggest()
+        //.UseTypoCorrections()
+        //.UseParseErrorReporting()
+        //.UseExceptionHandler()
+        //.CancelOnProcessTermination()
+
         .UseExceptionHandler(OnException)
         .UseService<IServiceProvider>(() => serviceProvider);
       if (configureBuilder != null)

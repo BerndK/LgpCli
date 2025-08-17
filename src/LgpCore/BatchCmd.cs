@@ -20,7 +20,7 @@ namespace LgpCore
     private BatchCmd(IServiceProvider serviceProvider)
     {
       this.commandLine = serviceProvider.GetRequiredService<CommandLine>();
-      this.parser = this.commandLine.Build(serviceProvider);
+      this.parser = this.commandLine.BuildParser(serviceProvider);
     }
 
     public BatchCmd([FromKeyedServices("app")]IConfigurationSection appSection, IServiceProvider serviceProvider) : this(serviceProvider)
@@ -165,7 +165,9 @@ namespace LgpCore
 
       return result;
     }
-    public bool AddCommand(string sCommand, out string? status)
+
+    public bool AddCommand(string sCommand, out string? status) => AddCommands(new[] { sCommand }, out status);
+    public bool AddCommands(IEnumerable<string> sCommands, out string? status)
     {
       status = null;
       try
@@ -185,7 +187,7 @@ namespace LgpCore
         }
         if (needsNewLine)
           allText += Environment.NewLine;
-        allText += sCommand;
+        allText += string.Join(Environment.NewLine, sCommands);
         File.WriteAllText(currentFile.FullName, allText);
         return true;
       }

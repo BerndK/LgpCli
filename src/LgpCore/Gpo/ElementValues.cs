@@ -1,4 +1,5 @@
-﻿using LgpCore.AdmParser;
+﻿using System.Collections.ObjectModel;
+using LgpCore.AdmParser;
 using System.Diagnostics.CodeAnalysis;
 using Infrastructure;
 using LgpCore.Infrastructure;
@@ -27,6 +28,13 @@ namespace LgpCore.Gpo
     public ElementValues(Policy policy, PolicyClass policyClass, Dictionary<PolicyElement, object?> values, Source source)
     {
       policyClass.CheckClassIsNotBoth();
+
+      //all values provided?
+      var missingElements = policy.Elements
+        .Where(e => !values.ContainsKey(e))
+        .ToList();
+      if (missingElements.Any())
+        throw new InvalidOperationException($"Policy '{policy.PrefixedName()}' is missing values for elements: {string.Join(", ", missingElements.Select(e => e.Id))}");
 
       Policy = policy;
       PolicyClass = policyClass;
@@ -84,7 +92,7 @@ namespace LgpCore.Gpo
 
   public static class PolicyElementValuesExtensions
   {
-    public static ElementValues Defaults(this Policy policy, PolicyClass policyClass)
+    public static ElementValues DefaultElementValues(this Policy policy, PolicyClass policyClass)
     {
       return new ElementValues(policy, policyClass, policy.DefaultValues(), ElementValues.Source.Defaults);
     }
