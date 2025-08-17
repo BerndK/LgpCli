@@ -286,15 +286,20 @@ namespace LgpCore.AdmParser
   //</xs:complexType>
   public class BooleanElement : PolicyElementBase
   {
-    public BooleanElement(Policy parent, string id, string? clientExtensionGuid, string? regKey, string? regValueName, List<ValueItem> trueValues, List<ValueItem> falseValues)
+    public BooleanElement(Policy parent, string id, string? clientExtensionGuid, string? regKey, string? regValueName,
+      List<ValueItem> trueValues, List<ValueItem> falseValues, bool? required)
       : base(parent, id, clientExtensionGuid, regKey, regValueName)
     {
       TrueValues = trueValues;
       FalseValues = falseValues;
+      Required = required;
     }
 
     public List<ValueItem> TrueValues { get; }
     public List<ValueItem> FalseValues { get; }
+    //this is not defined in the schema, but it is used in real world e.g. wuau.CorpWuURL
+    public bool? Required { get; }
+
   }
 
   //<xs:complexType name="DecimalElement">

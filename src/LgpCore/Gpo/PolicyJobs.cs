@@ -675,19 +675,37 @@ namespace LgpCore.Gpo
 
       var actions = boolValue
         ? GetTrueValueItems().GetActions(PolicyValueAction.SetValue, PolicyValueDeleteType.None)
-        : GetFalseValueItems().GetActions(PolicyValueAction.SetValue, PolicyValueDeleteType.None);
+        : GetFalseValueItems(false).GetActions(PolicyValueAction.SetValue, PolicyValueDeleteType.None);
 
       return actions.Execute(context);
     }
 
-    private IEnumerable<ValueItem> GetFalseValueItems()
+    private IEnumerable<ValueItem> GetFalseValueItems(bool forGetState)
     {
       if (BooleanElement.FalseValues.Any())
         return BooleanElement.FalseValues;
       //if no FalseValues are defined, create the default value
       //return Enumerable.Repeat(new ValueItem(RegKey, RegValueName, new DecimalValue(0)), 1);
-      //the default false value is deleting the value (not existing -> false)
-      return Enumerable.Repeat(new ValueItem(RegKey, RegValueName, new DeleteValue()), 1);
+      //the default false value is deleting the value (not existing -> false) but the other option is also valid
+      if (forGetState)
+      {
+        return
+        [
+          new ValueItem(RegKey, RegValueName, new DecimalValue(0)),
+          new ValueItem(RegKey, RegValueName, new DeleteValue())
+        ];
+      }
+      else
+      {
+        //when writing, only use one of the two options, not both
+        return
+        [
+#warning check if the field required will do difference here
+          //new ValueItem(RegKey, RegValueName, new DecimalValue(0)),
+          new ValueItem(RegKey, RegValueName, new DeleteValue())
+        ];
+
+      }
     }
 
     private IEnumerable<ValueItem> GetTrueValueItems()
@@ -698,16 +716,16 @@ namespace LgpCore.Gpo
       return Enumerable.Repeat(new ValueItem(RegKey, RegValueName, new DecimalValue(1)), 1);
     }
 
-    private IEnumerable<ValueItem> GetAllValueItems()
+    private IEnumerable<ValueItem> GetAllValueItems(bool forGetState)
     {
-      return GetFalseValueItems().Concat(GetTrueValueItems());
+      return GetFalseValueItems(forGetState).Concat(GetTrueValueItems());
     }
 
     public override bool Disable(GpoContext context)
     {
       //var actions = GetAllValueItems()
       //  .GetActions(PolicyValueAction.SetValue, PolicyValueDeleteType.DeleteValue)
-      var actions = GetFalseValueItems()
+      var actions = GetFalseValueItems(false)
         .GetActions(PolicyValueAction.SetValue, PolicyValueDeleteType.None)
         .ToList();
 
@@ -716,9 +734,9 @@ namespace LgpCore.Gpo
 
     public override bool NotConfigured(GpoContext context)
     {
-      var actions = GetAllValueItems()
+      var actions = GetAllValueItems(false)
         .GetActions(PolicyValueAction.RemoveValue, PolicyValueDeleteType.None)
-        .Concat(GetAllValueItems().GetActions(PolicyValueAction.RemoveValue, PolicyValueDeleteType.DeleteValue))
+        .Concat(GetAllValueItems(false).GetActions(PolicyValueAction.RemoveValue, PolicyValueDeleteType.DeleteValue))
         .ToList();
 
       return actions.Execute(context);
@@ -731,8 +749,8 @@ namespace LgpCore.Gpo
 
       using (context.Logger?.BeginScope($"Enabled"))
       {
-        bool enabledFalse = GetFalseValueItems().GetActions(PolicyValueAction.ValueShouldExist, PolicyValueDeleteType.None).Execute(context);
-        bool enabledTrue = GetTrueValueItems().GetActions(PolicyValueAction.ValueShouldExist, PolicyValueDeleteType.None).Execute(context);
+        bool enabledFalse = GetFalseValueItems(true).GetActions(PolicyValueAction.ValueShouldExist, PolicyValueDeleteType.None).Execute(context, ValueItemsJobExtensions.ActionsCheckMode.Any);
+        bool enabledTrue = GetTrueValueItems().GetActions(PolicyValueAction.ValueShouldExist, PolicyValueDeleteType.None).Execute(context, ValueItemsJobExtensions.ActionsCheckMode.Any);
 
         if (enabledFalse && enabledTrue)
           return new HashSet<PolicyState>() {PolicyState.Suspect};
@@ -744,18 +762,15 @@ namespace LgpCore.Gpo
       {
         //disabled = GetAllValueItems()
         //  .GetActions(PolicyValueAction.ValueShouldExist, PolicyValueDeleteType.DeleteValue)
-        disabled = GetFalseValueItems()
-          .GetActions(PolicyValueAction.ValueShouldExist, PolicyValueDeleteType.None)
-          .ToList()
-          .Execute(context);
+        disabled = GetFalseValueItems(true).GetActions(PolicyValueAction.ValueShouldExist, PolicyValueDeleteType.None).Execute(context, ValueItemsJobExtensions.ActionsCheckMode.Any);
       }
 
       bool notConfigured;
       using (context.Logger?.BeginScope($"NotConfigured"))
       {
-        notConfigured = GetAllValueItems()
+        notConfigured = GetAllValueItems(false)
           .GetActions(PolicyValueAction.ValueShouldNotExist, PolicyValueDeleteType.None)
-          .Concat(GetAllValueItems().GetActions(PolicyValueAction.ValueShouldNotExist, PolicyValueDeleteType.DeleteValue))
+          .Concat(GetAllValueItems(false).GetActions(PolicyValueAction.ValueShouldNotExist, PolicyValueDeleteType.DeleteValue))
           .ToList()
           .Execute(context);
       }
@@ -769,8 +784,8 @@ namespace LgpCore.Gpo
 
     public override object? GetValue(GpoContext context)
     {
-      bool enabledFalse = GetFalseValueItems().GetActions(PolicyValueAction.ValueShouldExist, PolicyValueDeleteType.None).Execute(context);
-      bool enabledTrue = GetTrueValueItems().GetActions(PolicyValueAction.ValueShouldExist, PolicyValueDeleteType.None).Execute(context);
+      bool enabledFalse = GetFalseValueItems(true).GetActions(PolicyValueAction.ValueShouldExist, PolicyValueDeleteType.None).Execute(context, ValueItemsJobExtensions.ActionsCheckMode.Any);
+      bool enabledTrue = GetTrueValueItems().GetActions(PolicyValueAction.ValueShouldExist, PolicyValueDeleteType.None).Execute(context, ValueItemsJobExtensions.ActionsCheckMode.Any);
 
       return enabledFalse ^ enabledTrue
         ? enabledTrue
@@ -784,15 +799,15 @@ namespace LgpCore.Gpo
       {
         case PolicyState.Enabled:
           actions.AddRange(GetTrueValueItems().GetActions(PolicyValueAction.SetValue, PolicyValueDeleteType.None));
-          actions.AddRange(GetFalseValueItems().GetActions(PolicyValueAction.SetValue, PolicyValueDeleteType.None));
+          actions.AddRange(GetFalseValueItems(true).GetActions(PolicyValueAction.SetValue, PolicyValueDeleteType.None));
           break;
         case PolicyState.Disabled:
-          actions.AddRange(GetFalseValueItems().GetActions(PolicyValueAction.SetValue, PolicyValueDeleteType.None));
+          actions.AddRange(GetFalseValueItems(true).GetActions(PolicyValueAction.SetValue, PolicyValueDeleteType.None));
           break;
         case PolicyState.NotConfigured:
-          actions.AddRange(GetAllValueItems()
+          actions.AddRange(GetAllValueItems(false)
             .GetActions(PolicyValueAction.RemoveValue, PolicyValueDeleteType.None)
-            .Concat(GetAllValueItems().GetActions(PolicyValueAction.RemoveValue, PolicyValueDeleteType.DeleteValue)));
+            .Concat(GetAllValueItems(false).GetActions(PolicyValueAction.RemoveValue, PolicyValueDeleteType.DeleteValue)));
           break;
 
         case PolicyState.Unknown:
@@ -1484,13 +1499,50 @@ namespace LgpCore.Gpo
       return new PolicyValueItemAction(action, regKey, regValueName, valueKind, fixedValue, deleteType);
     }
 
-    public static bool Execute(this ICollection<PolicyValueItemAction> actions, GpoContext context) //, bool? valueIfEmpty
+    public enum ActionsCheckMode
+    {
+      /// <summary>
+      /// All Actions need to be true
+      /// </summary>
+      All,
+
+      /// <summary>
+      /// at least One action needs to be true
+      /// </summary>
+      Any,
+
+      /// <summary>
+      /// Only one action is allowed to be true, all others must be false
+      /// </summary>
+      Single,
+
+      /// <summary>
+      /// No actions are allowed to be true, all must be false
+      /// </summary>
+      None
+    }
+
+    public static bool Execute(this ICollection<PolicyValueItemAction> actions, GpoContext context, ActionsCheckMode actionsCheckMode = ActionsCheckMode.All) //, bool? valueIfEmpty
     {
       if (!actions.Any())
         return false; //(valueIfEmpty ?? throw new InvalidOperationException("provide a default value for empty actionslist to execute"));
       actions = actions
         .Distinct(PolicyValueItemActionComparer.Instance)
         .ToList();
+
+      switch (actionsCheckMode)
+      {
+        case ActionsCheckMode.All:
+          return actions.All(a => a.Execute(context));
+        case ActionsCheckMode.Any:
+          return actions.Any(a => a.Execute(context));
+        case ActionsCheckMode.Single:
+          return actions.Count(a => a.Execute(context)) == 1;
+        case ActionsCheckMode.None:
+          return actions.All(a => !a.Execute(context));
+        default:
+          throw new ArgumentOutOfRangeException(nameof(actionsCheckMode), actionsCheckMode, null);
+      }
       return actions.All(a => a.Execute(context));
     }
 

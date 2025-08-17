@@ -35,6 +35,10 @@
       "commandName": "Project",
       "commandLineArgs": "interactive show windows.NoCDBurning User"
     },
+    "Test suspect": {
+      "commandName": "Project",
+      "commandLineArgs": "interactive show wuau.CorpWuURL Machine"
+    },
     "CommandSearch": {
       "commandName": "Project",
       "commandLineArgs": "search -s MediaSettings -s Geolocation"

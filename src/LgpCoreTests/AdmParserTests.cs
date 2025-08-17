@@ -202,7 +202,7 @@ namespace LgpCoreTests
       var boolElementInfos = admFolder.AllPolicies.Values
         .SelectMany(p => p.Elements)
         .OfType<BooleanElement>()
-        .Select(e => ($"TrueValues {e.TrueValues.Count}:{string.Join(", ", e.TrueValues.Select(v => v.Value.GetType().Name))} FalseValues {e.FalseValues.Count}:{string.Join(", ", e.FalseValues.Select(v => v.Value.GetType().Name))}", e))
+        .Select(e => ($"TrueValues {e.TrueValues.Count}:{string.Join(", ", e.TrueValues.Select(v => v.Value.GetType().Name))} FalseValues {e.FalseValues.Count}:{string.Join(", ", e.FalseValues.Select(v => v.Value.GetType().Name))} Required {e.IsRequired().ToString() ?? "<null>"}", e))
         .GroupBy(e => e.Item1, e => e.e)
         .ToList();
       Console.WriteLine($"BooleanElementInfos:");

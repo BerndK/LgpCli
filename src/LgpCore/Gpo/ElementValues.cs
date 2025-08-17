@@ -99,7 +99,7 @@ namespace LgpCore.Gpo
 
     public static Dictionary<PolicyElement, object?> DefaultValues(this Policy policy)
     {
-      return policy.Elements.ToDictionary(e => e, e => (e.IsRequired().HasValue && !e.IsRequired()!.Value) ? null : e.DefaultValue());
+      return policy.Elements.ToDictionary(e => e, e => e.DefaultValue());
     }
 
     public static Dictionary<PolicyElement, object> ValuesFromCommandLine(this Policy policy, List<(string key, List<string> values)> keyValues)

@@ -383,8 +383,10 @@ namespace LgpCli
             };
             var sValue = item.PolicyValueDeleteType switch
             {
-              PolicyValueDeleteType.None => item.Value?.ToString(),
-              _ => "<null>"
+              PolicyValueDeleteType.None => item.Value != null
+                ? $"{item.Value?.ToString()}"
+                : "<null>",
+              _ => "-"
             };
 
             //current Value
@@ -394,11 +396,12 @@ namespace LgpCli
               ? regKey.GetValueKind(item.RawRegValueName)
               : RegistryValueKind.Unknown;
             var sCurrentRegValue = regValue != null 
-              ? $"'{regValue}' ({regValueKind})"
+              ? $"[Value]'{regValue}'[/] ({regValueKind})"
               : "<null>";
 
+
             //Console.WriteLine($"  {item.Action}: {item.RegKey}|{item.RegValueName} '{item.Value ?? "<null>"}' ({item.ValueKind})");
-            Console.WriteLine($"  {sAction,-11}: {item.RegKey}|{item.RawRegValueName} '{item.Value ?? "<null>"}' ({item.RawValueKind}) Current:{sCurrentRegValue}");
+            CliTools.MarkupLine($"  {sAction,-11}: {item.RegKey}|{item.RawRegValueName} '{sValue}' ({item.RawValueKind}) Current:{sCurrentRegValue}");
           }
         }
         CliTools.EnterToContinue();

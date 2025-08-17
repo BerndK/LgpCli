@@ -451,6 +451,7 @@ namespace LgpCore.AdmParser
             falseValues.Insert(0, new ValueItem(regKey ?? defaultKey, regValueName, falseValue));
           }
 
+          var required = (bool?) elem.Attribute("required");
           return new BooleanElement(
             parent,
             id,
@@ -458,7 +459,8 @@ namespace LgpCore.AdmParser
             regKey,
             regValueName,
             trueValues,
-            falseValues);
+            falseValues,
+            required);
         }
         //<xs:complexType name="DecimalElement">
         //	<xs:attributeGroup ref="pd:PolicyElementAttributeGroup"/>

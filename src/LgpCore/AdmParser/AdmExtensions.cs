@@ -159,7 +159,8 @@ namespace LgpCore.AdmParser
           return decimalElement.Required;
         case EnumElement enumElement:
           return enumElement.Required;
-        //case BooleanElement booleanElement:
+        case BooleanElement booleanElement:
+          return booleanElement.Required;
         case LongDecimalElement longDecimalElement:
           return longDecimalElement.Required;
         case MultiTextElement multiTextElement:
@@ -180,13 +181,13 @@ namespace LgpCore.AdmParser
             ? new List<KeyValuePair<string, string>>()
             : new List<string>();
         case DecimalElement decimalElement:
-          return (int)0;
+          return (uint)0;
         case EnumElement enumElement:
           return enumElement.Items.FirstOrDefault()?.Id();
         case BooleanElement booleanElement:
           return false;
         case LongDecimalElement longDecimalElement:
-          return (long)0;
+          return (ulong)0;
         case MultiTextElement multiTextElement:
           return Array.Empty<string>();
         case TextElement textElement:
