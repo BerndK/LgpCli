@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
+using static System.Collections.Specialized.BitVector32;
 
 namespace LgpCore.Gpo
 {
@@ -147,7 +148,7 @@ namespace LgpCore.Gpo
     }
 
     public static List<(PolicyElement? element, PolicyValueItemAction action)> ReportRegistrySettings(
-      this Policy policy, PolicyClass policyClass, PolicyState policyState)
+      this Policy policy, PolicyState policyState)
     {
       var job = new PolicyJob(policy);
       return job.ReportRegistrySettings(policyState);
@@ -157,18 +158,12 @@ namespace LgpCore.Gpo
         RegistryValueKind RawValueKind, string sValue, string sCurrentRegValue)> items)>
       ReportRegistrySettingsEx(this Policy policy, PolicyClass policyClass, PolicyState policyState)
     {
-      (string regKey, string rawRegValueName, string sAction, RegistryValueKind rawValueKind, string sValue)
+      (string regKey, string rawRegValueName, PolicyValueDeleteType policyValueDeleteType, RegistryValueKind rawValueKind, string sValue)
         GetActionInfo(PolicyValueItemAction action)
       {
         var regKey = action.RegKey;
         var rawRegValueName = action.RawRegValueName;
-        var sAction = action.PolicyValueDeleteType switch
-        {
-          PolicyValueDeleteType.None => "SetValue",
-          PolicyValueDeleteType.DeleteValue => "DeleteValue",
-          PolicyValueDeleteType.DeleteValues => "DeleteKey",
-          _ => throw new ArgumentOutOfRangeException()
-        };
+        
         var sValue = action.PolicyValueDeleteType switch
         {
           PolicyValueDeleteType.None => action.Value != null
@@ -176,7 +171,7 @@ namespace LgpCore.Gpo
             : "<null>",
           _ => "-"
         };
-        return (regKey, rawRegValueName, sAction, action.RawValueKind, sValue);
+        return (regKey, rawRegValueName, action.PolicyValueDeleteType, action.RawValueKind, sValue);
       }
 
       using var rootReg = policyClass switch
@@ -187,7 +182,7 @@ namespace LgpCore.Gpo
           "Invalid PolicyClass for registry reporting")
       };
 
-      string GetCurrentValueText(string regKey, string regValueName)
+      string GetCurrentValueText(string regKey, string regValueName, PolicyValueDeleteType policyValueDeleteType)
       {
         //current Value
         using var key = rootReg.OpenSubKey(regKey, false);
@@ -197,7 +192,7 @@ namespace LgpCore.Gpo
           : RegistryValueKind.Unknown;
         var sCurrentRegValue = regValue != null
           ? $"[Value]'{regValue}'[/] ({regValueKind})"
-          : "<null>";
+          : policyValueDeleteType != PolicyValueDeleteType.None ? "[Value]<null>[/]" : "<null>" ;
         return sCurrentRegValue;
       }
 
@@ -209,21 +204,24 @@ namespace LgpCore.Gpo
           var element = g.Key;
           var actions = g;
 
-          Console.WriteLine($"{(element == null ? "<simple items>" : $"{element!.GetType().Name}:'{element!.Id}'")}");
-
-
           //Group same actions (pointing to same RegValue) and sum-up possible values
           var groupedActions = actions
             .Select(GetActionInfo)
-            .GroupBy(e => (e.regKey, e.rawRegValueName, e.sAction, e.rawValueKind))
+            .GroupBy(e => (e.regKey, e.rawRegValueName, e.policyValueDeleteType, e.rawValueKind))
             .Select(e => 
             (
               e.Key.regKey,
               e.Key.rawRegValueName,
-              e.Key.sAction,
+              sAction: e.Key.policyValueDeleteType switch
+              {
+                PolicyValueDeleteType.None => "SetValue",
+                PolicyValueDeleteType.DeleteValue => "DeleteValue",
+                PolicyValueDeleteType.DeleteValues => "DeleteKey",
+                _ => throw new ArgumentOutOfRangeException()
+              },
               e.Key.rawValueKind,
               sValue: string.Join("|", e.Select(a => a.sValue)),
-              sCurrentRegValue: GetCurrentValueText(e.Key.regKey, e.Key.rawRegValueName)
+              sCurrentRegValue: GetCurrentValueText(e.Key.regKey, e.Key.rawRegValueName, e.Key.policyValueDeleteType)
             ))
             .ToList();
           return (element: element, items: groupedActions);

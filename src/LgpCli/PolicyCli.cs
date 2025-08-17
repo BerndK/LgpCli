@@ -1,4 +1,5 @@
-﻿using System.Buffers;
+﻿using System;
+using System.Buffers;
 using System.Collections;
 using Cli;
 using LgpCore;
@@ -116,8 +117,8 @@ namespace LgpCli
           menuItems.Add("GD", "Get default values", () => elementValues?.SetDefaults()); 
           menuItems.Add("GB", "Get Values from current batch file", () => GetValuesFromBatchFile(serviceProvider, elementValues!, false), () => true);
           menuItems.Add("B", "Build Commandline for this policy", () => BuildCommandLineText(serviceProvider, policy, policyClass, elementValues), () => state != PolicyState.Unknown);
-          menuItems.Add("RS", "Report all GPO settings in registry", () => MainCli.ReportGpoSettingsRegistry(policyClass), () => true);
-          menuItems.Add("RR", "Report registry settings for this policy", () => ReportRegistrySettings(serviceProvider, policy, policyClass), () => true);
+          menuItems.Add("RS", "Report all GPO settings in registry (investigate GPO special registry)", () => MainCli.ReportGpoSettingsRegistry(policyClass), () => true);
+          menuItems.Add("RR", "Report registry settings for this policy (show related real registry keys)", () => ReportRegistrySettings(serviceProvider, policy, policyClass), () => true);
           menuItems.Add("R", "Refresh", () => {}, () => true);
           
           menuItems.Add("Esc", "Exit", () => { loop = false; });
@@ -355,110 +356,18 @@ namespace LgpCli
 
       if (CliTools.SelectItem(policyStates, "Select a state to be reported", PolicyState.Enabled, out var policyState, state => state.ToString()))
       {
-        var groups = policy.ReportRegistrySettings(policyClass, policyState)
-          .GroupBy(e => e.element, e => e.action);
-
-        using var rootReg = policyClass switch
-        {
-          PolicyClass.Machine => Registry.LocalMachine,
-          PolicyClass.User => Registry.CurrentUser,
-          _ => throw new ArgumentOutOfRangeException(nameof(policyClass), policyClass, "Invalid PolicyClass for registry reporting")
-        };
+        var elemInfos = policy.ReportRegistrySettingsEx(policyClass, policyState);
 
         CliTools.WarnMessage("This feature is in BETA. Don't write registry values directly to set Policies! Use 'Enable' to set a policy!", false);
         Console.WriteLine();
-
-        foreach (var group in groups)
+        foreach (var (element, items) in elemInfos)
         {
-          var element = group.Key;
-          var actions = group;
-
           Console.WriteLine($"{(element == null ? "<simple items>" : $"{element!.GetType().Name}:'{element!.Id}'")}");
 
-          (string regKey, string rawRegValueName, string sAction, RegistryValueKind rawValueKind, string sValue) GetActionInfo(PolicyValueItemAction action)
+          foreach (var (regKey, rawRegValueName, sAction, rawValueKind, sValue, sCurrentRegValue) in items)
           {
-            var regKey = action.RegKey;
-            var rawRegValueName = action.RawRegValueName;
-            var sAction = action.PolicyValueDeleteType switch
-            {
-              PolicyValueDeleteType.None => "SetValue",
-              PolicyValueDeleteType.DeleteValue => "DeleteValue",
-              PolicyValueDeleteType.DeleteValues => "DeleteKey",
-              _ => throw new ArgumentOutOfRangeException()
-            };
-            var sValue = action.PolicyValueDeleteType switch
-            {
-              PolicyValueDeleteType.None => action.Value != null
-                ? $"{action.Value?.ToString()}"
-                : "<null>",
-              _ => "-"
-            };
-            return (regKey, rawRegValueName, sAction, action.RawValueKind, sValue);
+            CliTools.MarkupLine($"  {sAction,-11}: {regKey}|{rawRegValueName} '{sValue}' ({rawValueKind}) Current:{sCurrentRegValue}");
           }
-
-          //Group same actions (pointing to same RegValue) and sum-up possible values
-          var groupedActions = actions
-            .Select(GetActionInfo)
-            .GroupBy(e => (e.regKey, e.rawRegValueName, e.sAction, e.rawValueKind))
-            .Select(e => new
-            {
-              e.Key.regKey,
-              e.Key.rawRegValueName,
-              e.Key.sAction,
-              e.Key.rawValueKind,
-              sValue = string.Join("|", e.Select(a => a.sValue))
-            })
-            .ToList();
-          foreach (var action in groupedActions)
-          {
-            //current Value
-            using var regKey = rootReg.OpenSubKey(action.regKey, false);
-            var regValue = regKey?.GetValue(action.rawRegValueName, null);
-            var regValueKind = regValue != null && regKey != null
-              ? regKey.GetValueKind(action.rawRegValueName)
-              : RegistryValueKind.Unknown;
-            var sCurrentRegValue = regValue != null
-              ? $"[Value]'{regValue}'[/] ({regValueKind})"
-              : "<null>";
-
-            //Console.WriteLine($"  {item.Action}: {item.RegKey}|{item.RegValueName} '{item.Value ?? "<null>"}' ({item.ValueKind})");
-            CliTools.MarkupLine($"  {action.sAction,-11}: {action.regKey}|{action.rawRegValueName} '{action.sValue}' ({action.rawValueKind}) Current:{sCurrentRegValue}");
-          }
-
-          //Console.WriteLine("######");
-
-          //foreach (var action in actions)
-          //{
-          //  //items per element
-          //  var sAction = action.PolicyValueDeleteType switch
-          //  {
-          //    PolicyValueDeleteType.None => "SetValue",
-          //    PolicyValueDeleteType.DeleteValue => "DeleteValue",
-          //    PolicyValueDeleteType.DeleteValues => "DeleteKey",
-          //    _ => throw new ArgumentOutOfRangeException()
-          //  };
-          //  var sValue = action.PolicyValueDeleteType switch
-          //  {
-          //    PolicyValueDeleteType.None => action.Value != null
-          //      ? $"{action.Value?.ToString()}"
-          //      : "<null>",
-          //    _ => "-"
-          //  };
-
-          //  //current Value
-          //  using var regKey = rootReg.OpenSubKey(action.RegKey, false);
-          //  var regValue = regKey?.GetValue(action.RawRegValueName, null);
-          //  var regValueKind = regValue != null && regKey != null
-          //    ? regKey.GetValueKind(action.RawRegValueName)
-          //    : RegistryValueKind.Unknown;
-          //  var sCurrentRegValue = regValue != null 
-          //    ? $"[Value]'{regValue}'[/] ({regValueKind})"
-          //    : "<null>";
-
-
-          //  //Console.WriteLine($"  {item.Action}: {item.RegKey}|{item.RegValueName} '{item.Value ?? "<null>"}' ({item.ValueKind})");
-          //  CliTools.MarkupLine($"  {sAction,-11}: {action.RegKey}|{action.RawRegValueName} '{sValue}' ({action.RawValueKind}) Current:{sCurrentRegValue}");
-          //}
         }
         CliTools.EnterToContinue();
       }
