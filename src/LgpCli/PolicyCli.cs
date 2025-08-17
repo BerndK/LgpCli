@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System.Buffers;
+using System.Collections;
 using Cli;
 using LgpCore;
 using LgpCore.AdmParser;
@@ -369,40 +370,95 @@ namespace LgpCli
 
         foreach (var group in groups)
         {
-          Console.WriteLine($"{(group.Key == null ? "<simple items>" : $"{group.Key!.GetType().Name}:'{group.Key!.Id}'")}");
-          var items = group;
-          foreach (var item in items)
+          var element = group.Key;
+          var actions = group;
+
+          Console.WriteLine($"{(element == null ? "<simple items>" : $"{element!.GetType().Name}:'{element!.Id}'")}");
+
+          (string regKey, string rawRegValueName, string sAction, RegistryValueKind rawValueKind, string sValue) GetActionInfo(PolicyValueItemAction action)
           {
-            //items per element
-            var sAction = item.PolicyValueDeleteType switch
+            var regKey = action.RegKey;
+            var rawRegValueName = action.RawRegValueName;
+            var sAction = action.PolicyValueDeleteType switch
             {
               PolicyValueDeleteType.None => "SetValue",
               PolicyValueDeleteType.DeleteValue => "DeleteValue",
               PolicyValueDeleteType.DeleteValues => "DeleteKey",
               _ => throw new ArgumentOutOfRangeException()
             };
-            var sValue = item.PolicyValueDeleteType switch
+            var sValue = action.PolicyValueDeleteType switch
             {
-              PolicyValueDeleteType.None => item.Value != null
-                ? $"{item.Value?.ToString()}"
+              PolicyValueDeleteType.None => action.Value != null
+                ? $"{action.Value?.ToString()}"
                 : "<null>",
               _ => "-"
             };
+            return (regKey, rawRegValueName, sAction, action.RawValueKind, sValue);
+          }
 
+          //Group same actions (pointing to same RegValue) and sum-up possible values
+          var groupedActions = actions
+            .Select(GetActionInfo)
+            .GroupBy(e => (e.regKey, e.rawRegValueName, e.sAction, e.rawValueKind))
+            .Select(e => new
+            {
+              e.Key.regKey,
+              e.Key.rawRegValueName,
+              e.Key.sAction,
+              e.Key.rawValueKind,
+              sValue = string.Join("|", e.Select(a => a.sValue))
+            })
+            .ToList();
+          foreach (var action in groupedActions)
+          {
             //current Value
-            using var regKey = rootReg.OpenSubKey(item.RegKey, false);
-            var regValue = regKey?.GetValue(item.RawRegValueName, null);
+            using var regKey = rootReg.OpenSubKey(action.regKey, false);
+            var regValue = regKey?.GetValue(action.rawRegValueName, null);
             var regValueKind = regValue != null && regKey != null
-              ? regKey.GetValueKind(item.RawRegValueName)
+              ? regKey.GetValueKind(action.rawRegValueName)
               : RegistryValueKind.Unknown;
-            var sCurrentRegValue = regValue != null 
+            var sCurrentRegValue = regValue != null
               ? $"[Value]'{regValue}'[/] ({regValueKind})"
               : "<null>";
 
-
             //Console.WriteLine($"  {item.Action}: {item.RegKey}|{item.RegValueName} '{item.Value ?? "<null>"}' ({item.ValueKind})");
-            CliTools.MarkupLine($"  {sAction,-11}: {item.RegKey}|{item.RawRegValueName} '{sValue}' ({item.RawValueKind}) Current:{sCurrentRegValue}");
+            CliTools.MarkupLine($"  {action.sAction,-11}: {action.regKey}|{action.rawRegValueName} '{action.sValue}' ({action.rawValueKind}) Current:{sCurrentRegValue}");
           }
+
+          //Console.WriteLine("######");
+
+          //foreach (var action in actions)
+          //{
+          //  //items per element
+          //  var sAction = action.PolicyValueDeleteType switch
+          //  {
+          //    PolicyValueDeleteType.None => "SetValue",
+          //    PolicyValueDeleteType.DeleteValue => "DeleteValue",
+          //    PolicyValueDeleteType.DeleteValues => "DeleteKey",
+          //    _ => throw new ArgumentOutOfRangeException()
+          //  };
+          //  var sValue = action.PolicyValueDeleteType switch
+          //  {
+          //    PolicyValueDeleteType.None => action.Value != null
+          //      ? $"{action.Value?.ToString()}"
+          //      : "<null>",
+          //    _ => "-"
+          //  };
+
+          //  //current Value
+          //  using var regKey = rootReg.OpenSubKey(action.RegKey, false);
+          //  var regValue = regKey?.GetValue(action.RawRegValueName, null);
+          //  var regValueKind = regValue != null && regKey != null
+          //    ? regKey.GetValueKind(action.RawRegValueName)
+          //    : RegistryValueKind.Unknown;
+          //  var sCurrentRegValue = regValue != null 
+          //    ? $"[Value]'{regValue}'[/] ({regValueKind})"
+          //    : "<null>";
+
+
+          //  //Console.WriteLine($"  {item.Action}: {item.RegKey}|{item.RegValueName} '{item.Value ?? "<null>"}' ({item.ValueKind})");
+          //  CliTools.MarkupLine($"  {sAction,-11}: {action.RegKey}|{action.RawRegValueName} '{sValue}' ({action.RawValueKind}) Current:{sCurrentRegValue}");
+          //}
         }
         CliTools.EnterToContinue();
       }
