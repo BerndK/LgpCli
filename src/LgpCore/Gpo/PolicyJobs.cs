@@ -300,7 +300,7 @@ namespace LgpCore.Gpo
     public string RegKey => Element.RegKey ?? Element.Parent.RegKey ?? throw new InvalidOperationException("No RegKey defined");
     public string RegValueName => Element is PolicyElementBase policyElementBase
       ? policyElementBase.RegValueName ?? Element.Parent.RegValueName ?? throw new InvalidOperationException("No RegValueName defined")
-      : throw new InvalidOperationException($"{Element.GetType().Name} does not implement RegValueName");
+      : Element.Parent.RegValueName ?? throw new InvalidOperationException($"{Element.GetType().Name} does not implement RegValueName");
     public abstract RegistryValueKind ValueKind { get; }
     public abstract Type ValueType { get; }
     public virtual bool Enable(GpoContext context, object value)
@@ -1021,6 +1021,31 @@ namespace LgpCore.Gpo
           ? rawValues.Select(e => new KeyValuePair<string, string>(ToolBox.TrimPrefix(e.Key, ListElement.ValuePrefix), e.Value)).ToList()
           : rawValues
         : rawValues.Select(e => e.Value).ToList();
+    }
+
+    public override List<PolicyValueItemAction> ReportRegistrySettings(PolicyState policyState)
+    {
+      List<PolicyValueItemAction> actions = new List<PolicyValueItemAction>();
+      var valueKind = ListElement.Expandable ? RegistryValueKind.ExpandString : RegistryValueKind.String;
+    
+      switch (policyState)
+      {
+        case PolicyState.Enabled:
+          actions.Add(new PolicyValueItemAction(PolicyValueAction.AnyValueShouldExist, RegKey, string.Empty, valueKind, null, PolicyValueDeleteType.None));
+          break;
+        case PolicyState.Disabled:
+          actions.Add(new PolicyValueItemAction(PolicyValueAction.NoValueShouldExist, RegKey, string.Empty, valueKind, null, PolicyValueDeleteType.None));
+          break;
+        case PolicyState.NotConfigured:
+          actions.Add(new PolicyValueItemAction(PolicyValueAction.NoValueShouldExist, RegKey, string.Empty, valueKind, null, PolicyValueDeleteType.None));
+          break;
+
+        case PolicyState.Unknown:
+        case PolicyState.Suspect:
+        default:
+          throw new ArgumentOutOfRangeException(nameof(policyState), policyState, null);
+      }
+      return actions;
     }
   }
 

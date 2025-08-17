@@ -4,7 +4,6 @@
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" Condition="Exists($([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../')))"/>
   
   <PropertyGroup>
-    <Version>0.8.2</Version>
     <!--
       see https://learn.microsoft.com/de-de/dotnet/core/project-sdk/msbuild-props#generateassemblyinfo
       see https://learn.microsoft.com/en-us/visualstudio/msbuild/customize-your-build  
@@ -12,7 +11,17 @@
       0.8.0 Initial version
       0.8.1 Run as admin
       0.8.2 better logging, allow nullable values (e.g. for TextElement)
+      0.8.3 Fix prefer default values, 
+            Fix when setting decimals (int vs uint error), 
+            Fix to avoid suspect for BooleanElements (accept 0 and **del)
+            Fix BatchCommands (Parser was inited multiple times), 
+            Feature to create batch for multiple items, 
+            Feature Report related Registry keys 
+            Feature Find policies by existing registry keys
+            bumped some packages
+      
     -->
+    <Version>0.8.3</Version>
     <Company>BK</Company>
     <Copyright>© 2025, Bernd Klaiber</Copyright>
     <Description>Cli tool to manage local group policies</Description>

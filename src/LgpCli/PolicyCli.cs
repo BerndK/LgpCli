@@ -358,15 +358,22 @@ namespace LgpCli
       {
         var elemInfos = policy.ReportRegistrySettingsEx(policyClass, policyState);
 
+        var rootKeyPrefix = policyClass switch
+        {
+          PolicyClass.Machine => "HKLM",
+          PolicyClass.User => "HKCU",
+          _ => throw new ArgumentOutOfRangeException(nameof(policyClass), policyClass, "Invalid PolicyClass for registry reporting")
+        };
+
         CliTools.WarnMessage("This feature is in BETA. Don't write registry values directly to set Policies! Use 'Enable' to set a policy!", false);
         Console.WriteLine();
         foreach (var (element, items) in elemInfos)
         {
           Console.WriteLine($"{(element == null ? "<simple items>" : $"{element!.GetType().Name}:'{element!.Id}'")}");
 
-          foreach (var (regKey, rawRegValueName, sAction, rawValueKind, sValue, sCurrentRegValue) in items)
+          foreach (var (regKey, rawRegValueName, sAction, rawValueKind, sValue, sCurrentRegValue, hasValue) in items)
           {
-            CliTools.MarkupLine($"  {sAction,-11}: {regKey}|{rawRegValueName} '{sValue}' ({rawValueKind}) Current:{sCurrentRegValue}");
+            CliTools.MarkupLine($"  {sAction,-11}: {rootKeyPrefix}\\{regKey}|{rawRegValueName} '{sValue}' ({rawValueKind}) Current:{sCurrentRegValue}");
           }
         }
         CliTools.EnterToContinue();

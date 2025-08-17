@@ -27,8 +27,27 @@ namespace LgpCore.Gpo
       });
     }
 
+    internal static IEnumerable<(Policy policy, PolicyClass policyClass)> PoliciesClasses(this AdmFolder admFolder)
+      => PoliciesClasses(admFolder.AllPolicies.Values);
+    
+    internal static IEnumerable<(Policy policy, PolicyClass policyClass)> PoliciesClasses(this IEnumerable<Policy> policies)
+      => policies
+        .SelectMany(p => p.PoliciesClasses())
+        .Distinct();
+
+    internal static IEnumerable<(Policy policy, PolicyClass policyClass)> PoliciesClasses(this Policy policy)
+    {
+      if (policy.IsInClass(PolicyClass.Machine))
+        yield return (policy, PolicyClass.Machine);
+      if (policy.IsInClass(PolicyClass.User))
+        yield return (policy, PolicyClass.User);
+    }
+
+    public static List<(Policy policy, PolicyClass policyClass, PolicyState state)> GetStates(this IEnumerable<Policy> policies) =>
+      GetStates(policies.PoliciesClasses());
+
     public static List<(Policy policy, PolicyClass policyClass, PolicyState state)> GetStates(
-      this IEnumerable<Policy> policies)
+      this IEnumerable<(Policy policy, PolicyClass policyClass)> policies)
     {
       return GpoHelper.RunInSta(() =>
       {
@@ -38,12 +57,12 @@ namespace LgpCore.Gpo
           using var contextUser = new GpoContext(gpo, PolicyClass.User);
 
           var result = new List<(Policy policy, PolicyClass policyClass, PolicyState state)>();
-          foreach (var policy in policies)
+          foreach (var (policy, policyClass) in policies)
           {
             var job = new PolicyJob(policy);
-            if (policy.IsInClass(PolicyClass.Machine))
+            if (policyClass == PolicyClass.Machine)
               result.Add((policy, PolicyClass.Machine, job.GetState(contextMachine)));
-            if (policy.IsInClass(PolicyClass.User))
+            if (policyClass == PolicyClass.User)
               result.Add((policy, PolicyClass.User, job.GetState(contextUser)));
           }
 
@@ -155,7 +174,7 @@ namespace LgpCore.Gpo
     }
 
     public static List<(PolicyElement? element, List<(string regKey, string rawRegValueName, string sAction,
-        RegistryValueKind RawValueKind, string sValue, string sCurrentRegValue)> items)>
+        RegistryValueKind RawValueKind, string sValue, string sCurrentRegValue, bool hasValue)> items)>
       ReportRegistrySettingsEx(this Policy policy, PolicyClass policyClass, PolicyState policyState)
     {
       (string regKey, string rawRegValueName, PolicyValueDeleteType policyValueDeleteType, RegistryValueKind rawValueKind, string sValue)
@@ -178,15 +197,15 @@ namespace LgpCore.Gpo
       {
         PolicyClass.Machine => Registry.LocalMachine,
         PolicyClass.User => Registry.CurrentUser,
-        _ => throw new ArgumentOutOfRangeException(nameof(policyClass), policyClass,
-          "Invalid PolicyClass for registry reporting")
+        _ => throw new ArgumentOutOfRangeException(nameof(policyClass), policyClass, "Invalid PolicyClass for registry reporting")
       };
 
-      string GetCurrentValueText(string regKey, string regValueName, PolicyValueDeleteType policyValueDeleteType)
+      string GetCurrentValueText(string regKey, string regValueName, PolicyValueDeleteType policyValueDeleteType, out bool hasValue)
       {
         //current Value
         using var key = rootReg.OpenSubKey(regKey, false);
         var regValue = key?.GetValue(regValueName, null);
+        hasValue = regValue != null;
         var regValueKind = regValue != null && key != null
           ? key.GetValueKind(regValueName)
           : RegistryValueKind.Unknown;
@@ -208,26 +227,50 @@ namespace LgpCore.Gpo
           var groupedActions = actions
             .Select(GetActionInfo)
             .GroupBy(e => (e.regKey, e.rawRegValueName, e.policyValueDeleteType, e.rawValueKind))
-            .Select(e => 
-            (
-              e.Key.regKey,
-              e.Key.rawRegValueName,
-              sAction: e.Key.policyValueDeleteType switch
+            .Select(e =>
+            {
+              var sAction = e.Key.policyValueDeleteType switch
               {
                 PolicyValueDeleteType.None => "SetValue",
                 PolicyValueDeleteType.DeleteValue => "DeleteValue",
                 PolicyValueDeleteType.DeleteValues => "DeleteKey",
                 _ => throw new ArgumentOutOfRangeException()
-              },
-              e.Key.rawValueKind,
-              sValue: string.Join("|", e.Select(a => a.sValue)),
-              sCurrentRegValue: GetCurrentValueText(e.Key.regKey, e.Key.rawRegValueName, e.Key.policyValueDeleteType)
-            ))
+              };
+              var sValue = string.Join("|", e.Select(a => a.sValue));
+              var sCurrentRegValue = GetCurrentValueText(e.Key.regKey, e.Key.rawRegValueName, e.Key.policyValueDeleteType, out var hasValue);
+              return (
+                e.Key.regKey,
+                e.Key.rawRegValueName,
+                sAction,
+                e.Key.rawValueKind,
+                sValue,
+                sCurrentRegValue,
+                hasValue
+              );
+            })
             .ToList();
           return (element: element, items: groupedActions);
         })
         .ToList();
       return elementItems;
+    }
+
+    public static List<(Policy policy, PolicyClass policyClass)> FindPoliciesByExistingRegistryEntries(this AdmFolder admFolder)
+      => FindPoliciesByExistingRegistryEntries(admFolder.PoliciesClasses());
+
+    public static List<(Policy policy, PolicyClass policyClass)> FindPoliciesByExistingRegistryEntries(this IEnumerable<(Policy policy, PolicyClass policyClass)> policies)
+    {
+      var result = new List<(Policy policy, PolicyClass policyClass)>();
+      foreach (var (policy, policyClass) in policies)
+      {
+        var elemRegInfos = ReportRegistrySettingsEx(policy, policyClass, PolicyState.Enabled);
+
+        if (elemRegInfos.Any(e => e.items.Any(i => i.hasValue)))
+        {
+          result.Add((policy, policyClass));
+        }
+      }
+      return result;
     }
   }
 }

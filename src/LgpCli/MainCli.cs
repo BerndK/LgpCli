@@ -9,7 +9,6 @@ using LgpCore.AdmParser;
 using LgpCore.Gpo;
 using LgpCore.Infrastructure;
 using LgpCore;
-using System.CommandLine;
 
 namespace LgpCli
 {
@@ -58,6 +57,7 @@ namespace LgpCli
           menuItems.Add("RS", "Report all GPO settings in registry (investigate GPO special registry)", () => ReportGpoSettingsRegistry(), () => true);
           menuItems.Add("M", "Manage Command File", () => ManageCommandFile(serviceProvider), () => true);
           menuItems.Add("BM", "Build Commandline for multiple policies", () => BuildCommandLineTexts(serviceProvider, admFolder), () => true);
+          menuItems.Add("FR", "Find policies by existing registry entries", () => FindPoliciesByExistingRegistryEntries(serviceProvider, admFolder), () => true);
           menuItems.Add("CL", "Change Language", () => ChangeLanguge(serviceProvider), () => true);
           menuItems.Add(new MenuItem("DebugDI", "DebugDI", () => DebugDi(serviceProvider), () => true) {HiddenButActive = true});
           menuItems.Add("Esc", "Exit", () => { loop = false; });
@@ -130,17 +130,26 @@ namespace LgpCli
     private static void ReportStates(IServiceProvider serviceProvider, AdmFolder admFolder)
     {
       var states = admFolder.AllPolicies.Values.GetStates();
+      ShowNavigateToPolicies(serviceProvider, states, false);
+    }
+
+    private static void ShowNavigateToPolicies(IServiceProvider serviceProvider, List<(Policy policy, PolicyClass policyClass, PolicyState state)> states, bool showNotConfigured)
+    {
       var countStates = states.CountBy(e => e.state).ToDictionary();
-      CliTools.MarkupLine($"{admFolder.AllPolicies.Count} [Policy]Policies[/] - {states.Count} States: [Enable]Enabled[/]:{countStates.GetValueOrDefault(PolicyState.Enabled, 0)} [Disable]Disabled[/]:{countStates.GetValueOrDefault(PolicyState.Disabled, 0)} [NotConfigure]NotConfigured[/]:{countStates.GetValueOrDefault(PolicyState.NotConfigured, 0)}");
-
-      var menuItems = new List<MenuItem>();
-      foreach ( var item in states.Where(e => e.state != PolicyState.NotConfigured))
+      bool done;
+      do
       {
-        menuItems.Add($"{PolicyCli.StateMarkupString(item.state)} for [PrefixedName]{item.policy.PrefixedName()}[/] ([Class]{item.policyClass}[/]) [Title]{item.policy.DisplayNameResolved()}[/]", () => PolicyCli.ShowPage(serviceProvider, item.policy, item.policyClass), () => true);
-      }
-      menuItems.Add("Esc", "Exit", () => { });
+        CliTools.MarkupLine($"{states.Count} [Policy]Policies[/] - {states.Count} States: [Enable]Enabled[/]:{countStates.GetValueOrDefault(PolicyState.Enabled, 0)} [Disable]Disabled[/]:{countStates.GetValueOrDefault(PolicyState.Disabled, 0)} [NotConfigure]NotConfigured[/]:{countStates.GetValueOrDefault(PolicyState.NotConfigured, 0)}");
 
-      CliTools.ShowMenu(null, menuItems.ToArray());
+        var menuItems = new List<MenuItem>();
+        foreach ( var item in states.Where(e => showNotConfigured || e.state != PolicyState.NotConfigured))
+        {
+          menuItems.Add($"{PolicyCli.StateMarkupString(item.state)} for [PrefixedName]{item.policy.PrefixedName()}[/] ([Class]{item.policyClass}[/]) [Title]{item.policy.DisplayNameResolved()}[/]", () => PolicyCli.ShowPage(serviceProvider, item.policy, item.policyClass), () => true);
+        }
+        var escItem = menuItems.Add("Esc", "Exit", () => { });
+
+        done = CliTools.ShowMenu(null, menuItems.ToArray()) == escItem;
+      } while (!done);
     }
 
     public static void ReportGpoSettingsRegistry()
@@ -233,6 +242,12 @@ namespace LgpCli
           CliTools.EnterToContinue();
       }
 
+    }
+
+    private static void FindPoliciesByExistingRegistryEntries(IServiceProvider serviceProvider, AdmFolder admFolder)
+    {
+      var candidates = admFolder.FindPoliciesByExistingRegistryEntries().GetStates();
+      ShowNavigateToPolicies(serviceProvider, candidates, true);
     }
 
     private static void ManageCommandFile(IServiceProvider serviceProvider)

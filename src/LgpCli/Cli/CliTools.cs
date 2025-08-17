@@ -873,15 +873,19 @@ namespace Cli
       }
     }
 
-    public static void Add(this ICollection<MenuItem> menuItems, string key, string text, Action? action,
+    public static MenuItem Add(this ICollection<MenuItem> menuItems, string key, string text, Action? action,
       Func<bool?>? canExecuteFunc = null, bool adminRequired = false, object? tag = null)
     {
-      menuItems.Add(new MenuItem(key, text, action, canExecuteFunc) { AdminRequired = adminRequired, Tag = tag});
+      var menuItem = new MenuItem(key, text, action, canExecuteFunc) {AdminRequired = adminRequired, Tag = tag};
+      menuItems.Add(menuItem);
+      return menuItem;
     }
-    public static void Add(this ICollection<MenuItem> menuItems, string text, Action? action,
+    public static MenuItem Add(this ICollection<MenuItem> menuItems, string text, Action? action,
       Func<bool?>? canExecuteFunc = null, bool adminRequired = false, object? tag = null)
     {
-      menuItems.Add(new MenuItem(text, action, canExecuteFunc) {AdminRequired = adminRequired, Tag = tag});
+      var menuItem = new MenuItem(text, action, canExecuteFunc) {AdminRequired = adminRequired, Tag = tag};
+      menuItems.Add(menuItem);
+      return menuItem;
     }
 
     public static void AddSeparator(this ICollection<MenuItem> menuItems, string text)
@@ -889,16 +893,18 @@ namespace Cli
       menuItems.Add(new MenuSeparator(text));
     }
 
-    public static void AddCheckBox(this ICollection<MenuItem> menuItems, string? key, string text, bool state, 
+    public static MenuItem AddCheckBox(this ICollection<MenuItem> menuItems, string? key, string text, bool state, 
       Action<bool> changeAction, Func<bool?>? canExecuteFunc = null)
     {
-      menuItems.Add(new MenuItem(key, (state ? "[X] " : "[ ] ") + text, () => changeAction(!state), canExecuteFunc));
+      var menuItem = new MenuItem(key, (state ? "[X] " : "[ ] ") + text, () => changeAction(!state), canExecuteFunc);
+      menuItems.Add(menuItem);
+      return menuItem;
     }
 
-    public static void AddCheckBoxNullable(this ICollection<MenuItem> menuItems, string? key, string text, bool? state, 
+    public static MenuItem AddCheckBoxNullable(this ICollection<MenuItem> menuItems, string? key, string text, bool? state, 
       Action<bool?> changeAction, Func<bool?>? canExecuteFunc = null)
     {
-      menuItems.Add(new MenuItem(key, (state == true ? "[X] " : state == false ? "[ ] " : "[?] ") + text, () =>
+      var menuItem = new MenuItem(key, (state == true ? "[X] " : state == false ? "[ ] " : "[?] ") + text, () =>
       {
         switch (state)
         {
@@ -912,10 +918,12 @@ namespace Cli
             changeAction(false);
             break;
         }
-      }, canExecuteFunc));
+      }, canExecuteFunc);
+      menuItems.Add(menuItem);
+      return menuItem;
     }
 
-    public static void AddCheckBox<T>(this ICollection<MenuItem> menuItems, string? key, string text, SelectableTag<T> tag,
+    public static MenuItem AddCheckBox<T>(this ICollection<MenuItem> menuItems, string? key, string text, SelectableTag<T> tag,
       Func<SelectableTag<T>, bool>? shallFlipState = null, Func<bool?>? canExecuteFunc = null)
     {
       
@@ -937,6 +945,7 @@ namespace Cli
         }
       };
       menuItems.Add(mi);
+      return mi;
     }
 
     public class SelectableTag<T>
